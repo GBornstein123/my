@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Singing App - Prototype</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🎵 Singing App</h1>
+            <p>A prototype app that sings melodies</p>
+        </header>
+
+        <main>
+            <section class="controls">
+                <h2>Choose a Song</h2>
+                <div class="song-buttons">
+                    <button class="song-btn" data-song="twinkle">Twinkle Twinkle</button>
+                    <button class="song-btn" data-song="happy">Happy Birthday</button>
+                    <button class="song-btn" data-song="mary">Mary Had a Little Lamb</button>
+                    <button class="song-btn" data-song="scale">Do-Re-Mi Scale</button>
+                </div>
+            </section>
+
+            <section class="playback">
+                <h2>Playback Controls</h2>
+                <button id="stopBtn" class="control-btn stop">Stop</button>
+            </section>
+
+            <section class="settings">
+                <h2>Voice Settings</h2>
+                <div class="slider-group">
+                    <label for="tempo">Tempo: <span id="tempoValue">120</span> BPM</label>
+                    <input type="range" id="tempo" min="60" max="240" value="120">
+                </div>
+                <div class="slider-group">
+                    <label for="waveform">Waveform:</label>
+                    <select id="waveform">
+                        <option value="sine">Sine (Smooth)</option>
+                        <option value="square">Square (Robot)</option>
+                        <option value="sawtooth">Sawtooth (Buzzy)</option>
+                        <option value="triangle">Triangle (Mellow)</option>
+                    </select>
+                </div>
+            </section>
+
+            <section class="visualizer">
+                <h2>Now Playing</h2>
+                <div id="noteDisplay" class="note-display">
+                    <span class="note-text">-</span>
+                </div>
+            </section>
+        </main>
+
+        <footer>
+            <p>Built with Web Audio API</p>
+        </footer>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
