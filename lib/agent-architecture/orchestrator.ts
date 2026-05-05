@@ -2,20 +2,36 @@ import { EmailContext, RowEnrichmentResult } from './core/types';
 import { EnrichmentResult, SearchResult, EnrichmentField } from '../types';
 import { parseEmail } from '../strategies/email-parser';
 import { FirecrawlService } from '../services/firecrawl';
+import { ExaService } from '../services/exa';
 import { OpenAIService } from '../services/openai';
 
 export class AgentOrchestrator {
   private firecrawl: FirecrawlService;
+  private exa: ExaService | null = null;
   private openai: OpenAIService;
-  
+
   constructor(
     private firecrawlApiKey: string,
-    private openaiApiKey: string
+    private openaiApiKey: string,
+    exaApiKey?: string
   ) {
     this.firecrawl = new FirecrawlService(firecrawlApiKey);
+    if (exaApiKey) {
+      this.exa = new ExaService(exaApiKey);
+    }
     this.openai = new OpenAIService(openaiApiKey);
   }
-  
+
+  private async search(
+    query: string,
+    options: { limit?: number; scrapeContent?: boolean } = {}
+  ): Promise<SearchResult[]> {
+    if (this.exa) {
+      return this.exa.search(query, { ...options, type: 'neural' });
+    }
+    return this.firecrawl.search(query, options);
+  }
+
   async enrichRow(
     row: Record<string, string>,
     fields: EnrichmentField[],
@@ -505,7 +521,7 @@ export class AgentOrchestrator {
           if (onAgentProgress) {
             onAgentProgress(`Search ${searchQueries.indexOf(query) + 1}/${searchQueries.length}: ${query.substring(0, 60)}...`, 'info');
           }
-          const searchResults = await this.firecrawl.search(
+          const searchResults = await this.search(
             query,
             { limit: 3 }
           );
@@ -646,7 +662,7 @@ export class AgentOrchestrator {
       onAgentProgress(`Searching for profile information...`, 'info');
     }
     
-    const searchResults = await this.firecrawl.search(searchQuery, { limit: 5, scrapeContent: true });
+    const searchResults = await this.search(searchQuery, { limit: 5, scrapeContent: true });
     
     console.log(`[AGENT-PROFILE] Found ${searchResults.length} search results`);
     
@@ -806,7 +822,7 @@ export class AgentOrchestrator {
       onAgentProgress(`Query: ${searchQuery.substring(0, 100)}...`, 'info');
     }
     
-    const searchResults = await this.firecrawl.search(searchQuery, { limit: 5, scrapeContent: true });
+    const searchResults = await this.search(searchQuery, { limit: 5, scrapeContent: true });
     
     console.log(`[AGENT-METRICS] Found ${searchResults.length} search results`);
     if (onAgentProgress) {
@@ -960,7 +976,7 @@ export class AgentOrchestrator {
       onAgentProgress(`Query: ${searchQuery.substring(0, 100)}...`, 'info');
     }
     
-    const searchResults = await this.firecrawl.search(searchQuery, { limit: 5, scrapeContent: true });
+    const searchResults = await this.search(searchQuery, { limit: 5, scrapeContent: true });
     
     console.log(`[AGENT-FUNDING] Found ${searchResults.length} search results`);
     if (onAgentProgress) {
@@ -1122,7 +1138,7 @@ export class AgentOrchestrator {
     
     let githubResults: SearchResult[] = [];
     try {
-      const searchResponse = await this.firecrawl.search(githubQuery, { 
+      const searchResponse = await this.search(githubQuery, { 
         limit: 3,
         scrapeContent: true
       });
@@ -1176,7 +1192,7 @@ export class AgentOrchestrator {
       onAgentProgress(`Searching for technology stack information...`, 'info');
     }
     
-    const techResults = await this.firecrawl.search(techSearchQuery, { 
+    const techResults = await this.search(techSearchQuery, { 
       limit: 3,
       scrapeContent: true
     });
@@ -1356,7 +1372,7 @@ export class AgentOrchestrator {
         if (onAgentProgress) {
           onAgentProgress(`Search ${i + 1}/${searchQueries.length}: ${query.substring(0, 60)}...`, 'info');
         }
-        const searchResults = await this.firecrawl.search(query, { limit: 3, scrapeContent: true });
+        const searchResults = await this.search(query, { limit: 3, scrapeContent: true });
         
         if (searchResults && searchResults.length > 0) {
           console.log(`[AGENT-GENERAL] Found ${searchResults.length} results`);
