@@ -9,19 +9,26 @@ import { Textarea } from "@/components/ui/textarea";
 import { Card } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { cn } from "@/lib/utils";
-import { CSVRow, EnrichmentField } from "@/lib/types";
+import { CSVRow, EnrichmentField, WaterfallConfig, WaterfallProvider } from "@/lib/types";
 import { detectEmailColumn, EMAIL_REGEX } from "@/lib/utils/email-detection";
 import { generateVariableName } from "@/lib/utils/field-utils";
-import { X, Plus, Sparkles, ChevronDown, ChevronUp } from "lucide-react";
+import { X, Plus, Sparkles, ChevronDown, ChevronUp, Layers, AlertCircle } from "lucide-react";
 import { toast } from "sonner";
-import { AlertCircle } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Switch } from "@/components/ui/switch";
 
 interface UnifiedEnrichmentViewProps {
   rows: CSVRow[];
   columns: string[];
-  onStartEnrichment: (emailColumn: string, fields: EnrichmentField[]) => void;
+  onStartEnrichment: (emailColumn: string, fields: EnrichmentField[], waterfallConfig: WaterfallConfig) => void;
 }
+
+const WATERFALL_PROVIDERS: { id: WaterfallProvider; label: string; description: string }[] = [
+  { id: 'domain-inference', label: 'Domain Inference', description: 'Instant — derives basic info from email domain, no API calls' },
+  { id: 'website-scrape', label: 'Website Scrape', description: 'Fast — scrapes the company website directly' },
+  { id: 'search', label: 'Web Search', description: 'Medium — Firecrawl search + LLM extraction' },
+  { id: 'multi-agent', label: 'Multi-Agent', description: 'Comprehensive — full agent orchestrator (most thorough)' },
+];
 
 const PRESET_FIELDS: EnrichmentField[] = [
   { name: 'companyName', displayName: 'Company Name', description: 'The name of the company', type: 'string', required: false },
@@ -52,6 +59,11 @@ export function UnifiedEnrichmentView({ rows, columns, onStartEnrichment }: Unif
   const [showAllRows, setShowAllRows] = useState(false);
   const [showEmailDropdown, setShowEmailDropdown] = useState(false);
   const [showEmailDropdownStep1, setShowEmailDropdownStep1] = useState(false);
+  const [waterfallEnabled, setWaterfallEnabled] = useState(false);
+  const [waterfallProviders, setWaterfallProviders] = useState<WaterfallProvider[]>(
+    ['domain-inference', 'website-scrape', 'search', 'multi-agent']
+  );
+  const [showWaterfallConfig, setShowWaterfallConfig] = useState(false);
   const [customField, setCustomField] = useState<{
     name: string;
     description: string;
@@ -614,10 +626,73 @@ export function UnifiedEnrichmentView({ rows, columns, onStartEnrichment }: Unif
                 </div>
               )}
 
-              <Button 
+              {/* Waterfall enrichment toggle */}
+              <div className="mt-6 border rounded-lg p-4 bg-muted/30">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Layers className="w-4 h-4 text-muted-foreground" />
+                    <span className="text-sm font-medium">Waterfall Enrichment</span>
+                  </div>
+                  <Switch
+                    checked={waterfallEnabled}
+                    onCheckedChange={setWaterfallEnabled}
+                  />
+                </div>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Try faster, cheaper providers first and fall through to more powerful ones only when needed.
+                </p>
+
+                {waterfallEnabled && (
+                  <div className="mt-3">
+                    <button
+                      type="button"
+                      className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
+                      onClick={() => setShowWaterfallConfig(v => !v)}
+                    >
+                      {showWaterfallConfig ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+                      {showWaterfallConfig ? 'Hide' : 'Configure'} providers
+                    </button>
+
+                    {showWaterfallConfig && (
+                      <div className="mt-3 space-y-2">
+                        <p className="text-xs text-muted-foreground mb-2">
+                          Providers are tried in order. Enabled providers that return high-confidence data short-circuit the waterfall.
+                        </p>
+                        {WATERFALL_PROVIDERS.map((p) => {
+                          const active = waterfallProviders.includes(p.id);
+                          return (
+                            <div key={p.id} className="flex items-start gap-3 p-2 rounded border bg-background">
+                              <Switch
+                                checked={active}
+                                onCheckedChange={(checked) => {
+                                  setWaterfallProviders(prev =>
+                                    checked
+                                      ? [...WATERFALL_PROVIDERS.map(x => x.id).filter(id => prev.includes(id) || id === p.id)]
+                                      : prev.filter(id => id !== p.id)
+                                  );
+                                }}
+                              />
+                              <div>
+                                <p className="text-xs font-medium">{p.label}</p>
+                                <p className="text-xs text-muted-foreground">{p.description}</p>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              <Button
                 variant="orange"
-                className="w-full mt-6 h-10 text-base" 
-                onClick={() => onStartEnrichment(emailColumn, selectedFields)}
+                className="w-full mt-4 h-10 text-base"
+                onClick={() => onStartEnrichment(emailColumn, selectedFields, {
+                  enabled: waterfallEnabled,
+                  providers: waterfallProviders,
+                  confidenceThreshold: 0.7,
+                })}
                 disabled={selectedFields.length === 0}
               >
                 <span className="flex items-center gap-2">

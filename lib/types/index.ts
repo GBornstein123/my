@@ -10,6 +10,14 @@ export interface EnrichmentField {
   required: boolean;
 }
 
+export type WaterfallProvider = 'domain-inference' | 'website-scrape' | 'search' | 'multi-agent';
+
+export interface WaterfallConfig {
+  enabled: boolean;
+  providers: WaterfallProvider[];
+  confidenceThreshold: number;
+}
+
 export interface EnrichmentRequest {
   rows: CSVRow[];
   fields: EnrichmentField[];
@@ -17,6 +25,7 @@ export interface EnrichmentRequest {
   nameColumn?: string;
   useAgents?: boolean;
   useV2Architecture?: boolean;
+  waterfallConfig?: WaterfallConfig;
 }
 
 export interface SearchResult {
@@ -44,6 +53,7 @@ export interface EnrichmentResult {
   value: string | number | boolean | string[];
   confidence: number;
   source?: string;
+  provider?: WaterfallProvider;
   sourceContext?: {
     url: string;
     snippet: string;

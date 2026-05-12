@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { CSVRow, EnrichmentField, RowEnrichmentResult } from '@/lib/types';
+import { CSVRow, EnrichmentField, RowEnrichmentResult, WaterfallConfig } from '@/lib/types';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { SourceContextTooltip } from './source-context-tooltip';
 import { Button } from '@/components/ui/button';
@@ -11,13 +11,21 @@ import { Label } from '@/components/ui/label';
 import { Download, X, Copy, ExternalLink, Globe, Mail, Check, ChevronDown, ChevronUp, Activity, CheckCircle, AlertCircle, Info } from 'lucide-react';
 import { toast } from 'sonner';
 
+const PROVIDER_LABELS: Record<string, { label: string; color: string }> = {
+  'domain-inference': { label: 'Domain', color: 'bg-blue-100 text-blue-700' },
+  'website-scrape':  { label: 'Scrape', color: 'bg-green-100 text-green-700' },
+  'search':          { label: 'Search', color: 'bg-yellow-100 text-yellow-700' },
+  'multi-agent':     { label: 'Agent',  color: 'bg-purple-100 text-purple-700' },
+};
+
 interface EnrichmentTableProps {
   rows: CSVRow[];
   fields: EnrichmentField[];
   emailColumn?: string;
+  waterfallConfig?: WaterfallConfig;
 }
 
-export function EnrichmentTable({ rows, fields, emailColumn }: EnrichmentTableProps) {
+export function EnrichmentTable({ rows, fields, emailColumn, waterfallConfig }: EnrichmentTableProps) {
   const [results, setResults] = useState<Map<number, RowEnrichmentResult>>(new Map());
   const [status, setStatus] = useState<'idle' | 'processing' | 'completed' | 'cancelled'>('idle');
   const [currentRow, setCurrentRow] = useState(-1);
@@ -106,7 +114,8 @@ export function EnrichmentTable({ rows, fields, emailColumn }: EnrichmentTablePr
           fields,
           emailColumn,
           useAgents,
-          useV2Architecture: true, // Use new agent architecture when agents are enabled
+          useV2Architecture: true,
+          waterfallConfig,
         }),
       });
 
@@ -772,6 +781,13 @@ export function EnrichmentTable({ rows, fields, emailColumn }: EnrichmentTablePr
                                   </div>
                                 )}
                               </div>
+                              {waterfallConfig?.enabled && enrichment.provider && PROVIDER_LABELS[enrichment.provider] && (
+                                <span
+                                  className={`inline-block mt-1 px-1.5 py-0.5 rounded text-[10px] font-medium ${PROVIDER_LABELS[enrichment.provider].color}`}
+                                >
+                                  {PROVIDER_LABELS[enrichment.provider].label}
+                                </span>
+                              )}
                               {(enrichment.source || enrichment.sourceContext) && (
                                 <div className="mt-1">
                                   <SourceContextTooltip

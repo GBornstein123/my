@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { AgentEnrichmentStrategy } from '@/lib/strategies/agent-enrichment-strategy';
+import { WaterfallEnrichmentStrategy } from '@/lib/strategies/waterfall-enrichment-strategy';
 import type { EnrichmentRequest, RowEnrichmentResult } from '@/lib/types';
 import { loadSkipList, shouldSkipEmail, getSkipReason } from '@/lib/utils/skip-list';
 
@@ -21,7 +22,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body: EnrichmentRequest = await request.json();
-    const { rows, fields, emailColumn, nameColumn } = body;
+    const { rows, fields, emailColumn, nameColumn, waterfallConfig } = body;
 
     if (!rows || rows.length === 0) {
       return NextResponse.json(
@@ -64,14 +65,13 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Always use the advanced agent architecture
-    const strategyName = 'AgentEnrichmentStrategy';
-    
-    console.log(`[STRATEGY] Using ${strategyName} - Advanced multi-agent architecture with specialized agents`);
-    const enrichmentStrategy = new AgentEnrichmentStrategy(
-      openaiApiKey,
-      firecrawlApiKey
-    );
+    const useWaterfall = waterfallConfig?.enabled === true;
+    const strategyName = useWaterfall ? 'WaterfallEnrichmentStrategy' : 'AgentEnrichmentStrategy';
+
+    console.log(`[STRATEGY] Using ${strategyName}`);
+    const enrichmentStrategy = useWaterfall
+      ? new WaterfallEnrichmentStrategy(openaiApiKey, firecrawlApiKey)
+      : new AgentEnrichmentStrategy(openaiApiKey, firecrawlApiKey);
 
     // Load skip list
     const skipList = await loadSkipList();
@@ -148,26 +148,37 @@ export async function POST(request: NextRequest) {
               console.log(`[ENRICHMENT] Processing row ${i + 1}/${rows.length} - Email: ${email} - Strategy: ${strategyName}`);
               const startTime = Date.now();
               
-              // Agent strategies return RowEnrichmentResult
-              const result = await enrichmentStrategy.enrichRow(
-                row,
-                fields,
-                emailColumn,
-                undefined, // onProgress
-                (message: string, type: 'info' | 'success' | 'warning' | 'agent') => {
-                  // Stream agent progress messages
-                  controller.enqueue(
-                    encoder.encode(
-                      `data: ${JSON.stringify({
-                        type: 'agent_progress',
-                        rowIndex: i,
-                        message,
-                        messageType: type,
-                      })}\n\n`
-                    )
-                  );
-                }
-              );
+              const progressCallback = (message: string, type: 'info' | 'success' | 'warning' | 'agent') => {
+                controller.enqueue(
+                  encoder.encode(
+                    `data: ${JSON.stringify({
+                      type: 'agent_progress',
+                      rowIndex: i,
+                      message,
+                      messageType: type,
+                    })}\n\n`
+                  )
+                );
+              };
+
+              let result: RowEnrichmentResult;
+              if (useWaterfall && enrichmentStrategy instanceof WaterfallEnrichmentStrategy) {
+                result = await enrichmentStrategy.enrichRow(
+                  row,
+                  fields,
+                  emailColumn,
+                  waterfallConfig!,
+                  progressCallback
+                );
+              } else {
+                result = await (enrichmentStrategy as AgentEnrichmentStrategy).enrichRow(
+                  row,
+                  fields,
+                  emailColumn,
+                  undefined,
+                  progressCallback
+                );
+              }
               result.rowIndex = i; // Set the correct row index
               
               const duration = Date.now() - startTime;

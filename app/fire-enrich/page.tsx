@@ -8,7 +8,7 @@ import { ArrowLeft, ExternalLink, Loader2 } from "lucide-react";
 import { CSVUploader } from "./csv-uploader";
 import { UnifiedEnrichmentView } from "./unified-enrichment-view";
 import { EnrichmentTable } from "./enrichment-table";
-import { CSVRow, EnrichmentField } from "@/lib/types";
+import { CSVRow, EnrichmentField, WaterfallConfig } from "@/lib/types";
 import {
   Dialog,
   DialogContent,
@@ -28,6 +28,7 @@ export default function CSVEnrichmentPage() {
   } | null>(null);
   const [emailColumn, setEmailColumn] = useState<string>('');
   const [selectedFields, setSelectedFields] = useState<EnrichmentField[]>([]);
+  const [waterfallConfig, setWaterfallConfig] = useState<WaterfallConfig>({ enabled: false, providers: [], confidenceThreshold: 0.7 });
   const [isCheckingEnv, setIsCheckingEnv] = useState(true);
   const [showApiKeyModal, setShowApiKeyModal] = useState(false);
   const [firecrawlApiKey, setFirecrawlApiKey] = useState<string>('');
@@ -102,9 +103,10 @@ export default function CSVEnrichmentPage() {
     }
   };
 
-  const handleStartEnrichment = (email: string, fields: EnrichmentField[]) => {
+  const handleStartEnrichment = (email: string, fields: EnrichmentField[], config: WaterfallConfig) => {
     setEmailColumn(email);
     setSelectedFields(fields);
+    setWaterfallConfig(config);
     setStep('enrichment');
   };
 
@@ -277,6 +279,7 @@ export default function CSVEnrichmentPage() {
               rows={csvData.rows}
               fields={selectedFields}
               emailColumn={emailColumn}
+              waterfallConfig={waterfallConfig}
             />
             <div className="mt-6 text-center">
               <Button
