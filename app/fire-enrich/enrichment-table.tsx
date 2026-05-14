@@ -15,9 +15,10 @@ interface EnrichmentTableProps {
   rows: CSVRow[];
   fields: EnrichmentField[];
   emailColumn?: string;
+  useQuickenrich?: boolean;
 }
 
-export function EnrichmentTable({ rows, fields, emailColumn }: EnrichmentTableProps) {
+export function EnrichmentTable({ rows, fields, emailColumn, useQuickenrich = false }: EnrichmentTableProps) {
   const [results, setResults] = useState<Map<number, RowEnrichmentResult>>(new Map());
   const [status, setStatus] = useState<'idle' | 'processing' | 'completed' | 'cancelled'>('idle');
   const [currentRow, setCurrentRow] = useState(-1);
@@ -84,20 +85,18 @@ export function EnrichmentTable({ rows, fields, emailColumn }: EnrichmentTablePr
       // Get API keys from localStorage if not in environment
       const firecrawlApiKey = localStorage.getItem('firecrawl_api_key');
       const openaiApiKey = localStorage.getItem('openai_api_key');
-      
+      const quickenrichApiKey = localStorage.getItem('quickenrich_api_key');
+
       const headers: Record<string, string> = {
         'Content-Type': 'application/json',
-        ...(useAgents && { 'x-use-agents': 'true' }),
+        ...(useAgents && !useQuickenrich && { 'x-use-agents': 'true' }),
       };
-      
+
       // Add API keys to headers if available
-      if (firecrawlApiKey) {
-        headers['X-Firecrawl-API-Key'] = firecrawlApiKey;
-      }
-      if (openaiApiKey) {
-        headers['X-OpenAI-API-Key'] = openaiApiKey;
-      }
-      
+      if (firecrawlApiKey) headers['X-Firecrawl-API-Key'] = firecrawlApiKey;
+      if (openaiApiKey) headers['X-OpenAI-API-Key'] = openaiApiKey;
+      if (quickenrichApiKey && useQuickenrich) headers['X-Quickenrich-API-Key'] = quickenrichApiKey;
+
       const response = await fetch('/api/enrich', {
         method: 'POST',
         headers,
@@ -105,8 +104,9 @@ export function EnrichmentTable({ rows, fields, emailColumn }: EnrichmentTablePr
           rows,
           fields,
           emailColumn,
-          useAgents,
-          useV2Architecture: true, // Use new agent architecture when agents are enabled
+          useAgents: !useQuickenrich && useAgents,
+          useV2Architecture: !useQuickenrich,
+          useQuickenrich,
         }),
       });
 

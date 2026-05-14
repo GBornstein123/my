@@ -28,6 +28,7 @@ export default function CSVEnrichmentPage() {
   } | null>(null);
   const [emailColumn, setEmailColumn] = useState<string>('');
   const [selectedFields, setSelectedFields] = useState<EnrichmentField[]>([]);
+  const [useQuickenrich, setUseQuickenrich] = useState(false);
   const [isCheckingEnv, setIsCheckingEnv] = useState(true);
   const [showApiKeyModal, setShowApiKeyModal] = useState(false);
   const [firecrawlApiKey, setFirecrawlApiKey] = useState<string>('');
@@ -102,9 +103,10 @@ export default function CSVEnrichmentPage() {
     }
   };
 
-  const handleStartEnrichment = (email: string, fields: EnrichmentField[]) => {
+  const handleStartEnrichment = (email: string, fields: EnrichmentField[], qe = false) => {
     setEmailColumn(email);
     setSelectedFields(fields);
+    setUseQuickenrich(qe);
     setStep('enrichment');
   };
 
@@ -121,6 +123,7 @@ export default function CSVEnrichmentPage() {
     setCsvData(null);
     setEmailColumn('');
     setSelectedFields([]);
+    setUseQuickenrich(false);
   };
 
   const openFirecrawlWebsite = () => {
@@ -277,6 +280,7 @@ export default function CSVEnrichmentPage() {
               rows={csvData.rows}
               fields={selectedFields}
               emailColumn={emailColumn}
+              useQuickenrich={useQuickenrich}
             />
             <div className="mt-6 text-center">
               <Button

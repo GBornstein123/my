@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { AgentEnrichmentStrategy } from '@/lib/strategies/agent-enrichment-strategy';
+import { QuickenrichEnrichmentStrategy } from '@/lib/strategies/quickenrich-enrichment-strategy';
 import type { EnrichmentRequest, RowEnrichmentResult } from '@/lib/types';
 import { loadSkipList, shouldSkipEmail, getSkipReason } from '@/lib/utils/skip-list';
 
@@ -21,7 +22,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body: EnrichmentRequest = await request.json();
-    const { rows, fields, emailColumn, nameColumn } = body;
+    const { rows, fields, emailColumn, nameColumn, useQuickenrich } = body;
 
     if (!rows || rows.length === 0) {
       return NextResponse.json(
@@ -49,29 +50,36 @@ export async function POST(request: NextRequest) {
     const abortController = new AbortController();
     activeSessions.set(sessionId, abortController);
 
-    // Check environment variables and headers for API keys
+    // Resolve API keys from env or per-request headers
+    const quickenrichApiKey = process.env.QUICKENRICH_API_KEY || request.headers.get('X-Quickenrich-API-Key');
     const openaiApiKey = process.env.OPENAI_API_KEY || request.headers.get('X-OpenAI-API-Key');
     const firecrawlApiKey = process.env.FIRECRAWL_API_KEY || request.headers.get('X-Firecrawl-API-Key');
-    
-    if (!openaiApiKey || !firecrawlApiKey) {
-      console.error('Missing API keys:', { 
-        hasOpenAI: !!openaiApiKey, 
-        hasFirecrawl: !!firecrawlApiKey 
-      });
-      return NextResponse.json(
-        { error: 'Server configuration error: Missing API keys' },
-        { status: 500 }
-      );
+
+    let enrichmentStrategy: AgentEnrichmentStrategy | QuickenrichEnrichmentStrategy;
+    let strategyName: string;
+
+    if (useQuickenrich) {
+      if (!quickenrichApiKey) {
+        return NextResponse.json(
+          { error: 'Server configuration error: Missing Quickenrich API key' },
+          { status: 500 }
+        );
+      }
+      strategyName = 'QuickenrichEnrichmentStrategy';
+      enrichmentStrategy = new QuickenrichEnrichmentStrategy(quickenrichApiKey);
+    } else {
+      if (!openaiApiKey || !firecrawlApiKey) {
+        console.error('Missing API keys:', { hasOpenAI: !!openaiApiKey, hasFirecrawl: !!firecrawlApiKey });
+        return NextResponse.json(
+          { error: 'Server configuration error: Missing API keys' },
+          { status: 500 }
+        );
+      }
+      strategyName = 'AgentEnrichmentStrategy';
+      enrichmentStrategy = new AgentEnrichmentStrategy(openaiApiKey, firecrawlApiKey);
     }
 
-    // Always use the advanced agent architecture
-    const strategyName = 'AgentEnrichmentStrategy';
-    
-    console.log(`[STRATEGY] Using ${strategyName} - Advanced multi-agent architecture with specialized agents`);
-    const enrichmentStrategy = new AgentEnrichmentStrategy(
-      openaiApiKey,
-      firecrawlApiKey
-    );
+    console.log(`[STRATEGY] Using ${strategyName}`);
 
     // Load skip list
     const skipList = await loadSkipList();

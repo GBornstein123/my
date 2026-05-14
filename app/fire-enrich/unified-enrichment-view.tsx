@@ -20,7 +20,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 interface UnifiedEnrichmentViewProps {
   rows: CSVRow[];
   columns: string[];
-  onStartEnrichment: (emailColumn: string, fields: EnrichmentField[]) => void;
+  onStartEnrichment: (emailColumn: string, fields: EnrichmentField[], useQuickenrich: boolean) => void;
 }
 
 const PRESET_FIELDS: EnrichmentField[] = [
@@ -38,6 +38,10 @@ const PRESET_FIELDS: EnrichmentField[] = [
 export function UnifiedEnrichmentView({ rows, columns, onStartEnrichment }: UnifiedEnrichmentViewProps) {
   const [step, setStep] = useState<1 | 2>(1);
   const [emailColumn, setEmailColumn] = useState<string>('');
+  const [dataSource, setDataSource] = useState<'agents' | 'quickenrich'>('agents');
+  const [quickenrichKey, setQuickenrichKey] = useState<string>(() =>
+    typeof window !== 'undefined' ? localStorage.getItem('quickenrich_api_key') ?? '' : ''
+  );
   const [selectedFields, setSelectedFields] = useState<EnrichmentField[]>([
     // Default selected fields (3 fields)
     PRESET_FIELDS.find(f => f.name === 'companyName')!,
@@ -614,11 +618,69 @@ export function UnifiedEnrichmentView({ rows, columns, onStartEnrichment }: Unif
                 </div>
               )}
 
-              <Button 
+              {/* Data source selector */}
+              <div className="mt-6 space-y-3">
+                <label className="text-sm font-semibold text-zinc-700 dark:text-zinc-300">Data Source</label>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => setDataSource('agents')}
+                    className={cn(
+                      "flex-1 px-3 py-2 text-sm rounded-lg border transition-all font-medium",
+                      dataSource === 'agents'
+                        ? "bg-zinc-900 text-white border-zinc-900 dark:bg-white dark:text-zinc-900 dark:border-white"
+                        : "bg-white text-zinc-700 border-zinc-200 hover:border-zinc-300 dark:bg-zinc-800 dark:text-zinc-300 dark:border-zinc-700"
+                    )}
+                  >
+                    AI Agents
+                  </button>
+                  <button
+                    onClick={() => setDataSource('quickenrich')}
+                    className={cn(
+                      "flex-1 px-3 py-2 text-sm rounded-lg border transition-all font-medium",
+                      dataSource === 'quickenrich'
+                        ? "bg-orange-500 text-white border-orange-500"
+                        : "bg-white text-zinc-700 border-zinc-200 hover:border-zinc-300 dark:bg-zinc-800 dark:text-zinc-300 dark:border-zinc-700"
+                    )}
+                  >
+                    Quickenrich
+                  </button>
+                </div>
+
+                {dataSource === 'quickenrich' && (
+                  <div className="space-y-1.5">
+                    <label className="text-xs text-zinc-500 dark:text-zinc-400">
+                      Quickenrich API Key
+                    </label>
+                    <Input
+                      type="password"
+                      placeholder="qe_..."
+                      value={quickenrichKey}
+                      onChange={(e) => {
+                        setQuickenrichKey(e.target.value);
+                        if (e.target.value) localStorage.setItem('quickenrich_api_key', e.target.value);
+                      }}
+                      className="border-orange-200 focus:border-orange-400 dark:border-orange-900/30 dark:focus:border-orange-700"
+                    />
+                    <p className="text-xs text-zinc-400">
+                      Skips AI agents — contacts enriched directly from Quickenrich database.
+                    </p>
+                  </div>
+                )}
+              </div>
+
+              <Button
                 variant="orange"
-                className="w-full mt-6 h-10 text-base" 
-                onClick={() => onStartEnrichment(emailColumn, selectedFields)}
-                disabled={selectedFields.length === 0}
+                className="w-full mt-4 h-10 text-base"
+                onClick={() => {
+                  if (dataSource === 'quickenrich' && quickenrichKey) {
+                    localStorage.setItem('quickenrich_api_key', quickenrichKey);
+                  }
+                  onStartEnrichment(emailColumn, selectedFields, dataSource === 'quickenrich');
+                }}
+                disabled={
+                  selectedFields.length === 0 ||
+                  (dataSource === 'quickenrich' && !quickenrichKey.trim())
+                }
               >
                 <span className="flex items-center gap-2">
                   <Sparkles className="w-5 h-5" />
