@@ -11,8 +11,16 @@ your brain skips the mechanics of reading and just absorbs meaning.
   letter is tinted so your eye locks onto the same spot for every word
 - **Adjustable speed** from 100 to 1200 wpm, with smart pauses on punctuation,
   paragraph breaks, long words, and numbers
-- **Import anything** — paste text, or import `.txt`, `.md`, and PDF files
+- **Import anything** — paste text, or import `.txt`, `.md`, `.html`, and PDF files
   (PDF extraction runs fully in-browser via pdf.js)
+- **Paid newsletters (Substack etc.)** — save the email as `.eml` (Gmail desktop:
+  open the email → ⋮ → "Download message") and import it; the reader decodes the
+  MIME message, finds the article body, and strips subscribe buttons, upsells,
+  and footers
+- **EPUB books** — full spine-ordered chapter extraction with a dependency-free
+  zip reader (browser-native `DecompressionStream`). Kindle purchases
+  (`.azw`/`.kfx`) are DRM-locked by Amazon and cannot be imported; use DRM-free
+  EPUBs
 - **Library with progress** — every document remembers where you left off
 - **Stats** — words read, time in focus, average/top speed, sessions, finished
   documents, and a daily reading streak

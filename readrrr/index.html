@@ -238,8 +238,9 @@
     <h2>Add something to read</h2>
     <div id="sheet-main">
       <button class="sheet-row" id="row-paste"><span class="ic">✍️</span><span>Paste text<small>Articles, notes, emails — anything</small></span></button>
-      <button class="sheet-row" id="row-file"><span class="ic">📄</span><span>Import a file<small>PDF, .txt or .md</small></span></button>
-      <input type="file" id="file-input" accept=".txt,.md,.pdf,text/plain,application/pdf" class="hidden">
+      <button class="sheet-row" id="row-file"><span class="ic">📄</span><span>Import a file<small>PDF, EPUB, email (.eml), .html, .txt, .md</small></span></button>
+      <input type="file" id="file-input" accept=".txt,.md,.pdf,.eml,.epub,.html,.htm,text/plain,application/pdf,message/rfc822,application/epub+zip,text/html" class="hidden">
+      <p class="note" style="margin-top:6px"><b>Substack &amp; paid newsletters:</b> in Gmail on desktop, open the email → ⋮ → “Download message”, then import the .eml here. The reader strips the buttons and footer and keeps the article. On your phone, opening the post, select all, and copy‑paste works too.<br><br><b>Books:</b> DRM‑free EPUBs import fully, chapter by chapter. Kindle purchases (.azw/.kfx) are locked by Amazon’s DRM and can’t be opened outside Kindle apps.</p>
     </div>
     <div id="sheet-paste" class="hidden">
       <textarea id="paste-area" placeholder="Paste your text here…"></textarea>
@@ -278,7 +279,7 @@ if (!store.docs.length && !store.stats.words) {
     "The highlighted letter marks the spot your eye locks onto. Because your eyes never move, your brain skips the slow mechanics of reading and just absorbs meaning.\n\n" +
     "Tap the screen or the play button to start and stop. Use plus and minus to change speed. Start around 300 words per minute. When it feels easy, nudge it up. Most people are comfortable at 450 or more within a few days.\n\n" +
     "If you zone out, tap the rewind button to jump back one sentence. Drag the slider to scrub anywhere in the text.\n\n" +
-    "To add your own reading, go back to the library and tap the plus button. You can paste any text or import a PDF. Your progress and stats are saved on this device automatically.\n\n" +
+    "To add your own reading, go back to the library and tap the plus button. You can paste any text, or import PDFs, EPUB books, saved emails, and web pages. Paid Substack posts import cleanly from a saved email file. Your progress and stats are saved on this device automatically.\n\n" +
     "That's everything. Happy reading.");
 }
 
@@ -371,18 +372,223 @@ $("file-input").onchange = async (e) => {
   const f = e.target.files[0];
   e.target.value = "";
   if (!f) return;
+  const h2 = document.querySelector("#sheet h2");
+  const prevH2 = h2.textContent;
+  h2.textContent = "Importing…";
   try {
-    let text;
-    if (/\.pdf$/i.test(f.name) || f.type === "application/pdf") text = await pdfToText(f);
-    else text = await f.text();
-    text = (text || "").trim();
-    if (!text) { alert("Couldn't find any text in that file."); return; }
-    const doc = addDoc(f.name.replace(/\.(pdf|txt|md)$/i, ""), text);
+    const base = f.name.replace(/\.[^.]+$/, "");
+    let d;
+    if (/\.pdf$/i.test(f.name) || f.type === "application/pdf") d = { title: base, text: await pdfToText(f) };
+    else if (/\.eml$/i.test(f.name) || f.type === "message/rfc822") d = await emlToDoc(f);
+    else if (/\.epub$/i.test(f.name) || f.type === "application/epub+zip") d = await epubToDoc(f);
+    else if (/\.(azw3?|kfx|mobi|prc)$/i.test(f.name)) throw new Error("Kindle formats are DRM-locked by Amazon and can't be opened here. Export or buy the book as a DRM-free EPUB instead.");
+    else if (/\.html?$/i.test(f.name) || f.type === "text/html") {
+      const dom = new DOMParser().parseFromString(await f.text(), "text/html");
+      d = { title: dom.title || base, text: htmlToText(dom.body || dom.documentElement) };
+    }
+    else d = { title: base, text: (await f.text()) };
+    d.text = cleanText(d.text || "");
+    if (!d.text) { alert("Couldn't find any text in that file."); return; }
+    const doc = addDoc((d.title || base).trim() || base, d.text);
     closeSheet(); openReader(doc);
   } catch (err) {
     alert("Import failed: " + (err && err.message ? err.message : err));
+  } finally {
+    h2.textContent = prevH2;
   }
 };
+
+/* ---------- html → clean text ---------- */
+const INVISIBLES = /[­͏​-‍ ⁠﻿]/g;
+function cleanText(t) {
+  return t.replace(INVISIBLES, "")
+    .split("\n").map(l => l.replace(/[ \t\u00a0]+/g, " ").trim()).join("\n")
+    .replace(/\n{3,}/g, "\n\n").trim();
+}
+function htmlToText(root) {
+  if (!root) return "";
+  let out = "";
+  const SKIP = /^(SCRIPT|STYLE|HEAD|TITLE|NOSCRIPT|TEMPLATE|IFRAME|SVG|IMG|PICTURE|VIDEO|AUDIO|BUTTON|SELECT|INPUT|FORM)$/;
+  const BLOCK = /^(P|DIV|H[1-6]|LI|UL|OL|DL|DT|DD|TR|TABLE|SECTION|ARTICLE|ASIDE|HEADER|FOOTER|BLOCKQUOTE|FIGURE|FIGCAPTION|PRE|HR|MAIN|NAV)$/;
+  (function walk(node) {
+    if (node.nodeType === 3) { out += node.nodeValue; return; }
+    if (node.nodeType !== 1 || SKIP.test(node.tagName)) return;
+    if (node.tagName === "BR") { out += "\n"; return; }
+    const block = BLOCK.test(node.tagName);
+    for (const c of node.childNodes) walk(c);
+    if (block) out += "\n\n";
+  })(root);
+  return cleanText(out);
+}
+
+/* ---------- email (.eml) import — Substack & other newsletters ---------- */
+const EMAIL_NOISE = /^(unsubscribe|view (this post )?in ((your|the) )?(browser|app)|forwarded this email\??|subscribe( now| for more)?|sign (up|in)|upgrade( now| today| to listen)?|comment|like|share|restack|download( as)?( a)? pdf|continue reading.*|become a paid subscriber.*|already have an account\??|preview|or|read in app|open in app|get the app|start writing|©.*|copyright ©?.*)$/i;
+function emailHtmlToText(html) {
+  const dom = new DOMParser().parseFromString(html, "text/html");
+  // Substack (and most newsletter platforms) wrap the article in a post-body container.
+  // Try the most specific selector first, and among matches take the one with the most
+  // text — a combined selector list would return whichever matches earliest in the
+  // document (often an ancestor wrapper or a header block), not the article itself.
+  let content = null;
+  for (const sel of [".body.markup", "[class*='postBody' i]", "[class*='post-body' i]", ".post", ".message-body", "[class*='email-body' i]"]) {
+    const els = Array.from(dom.querySelectorAll(sel));
+    if (els.length) { content = els.reduce((a, b) => (b.textContent.length > a.textContent.length ? b : a)); break; }
+  }
+  if (!content) content = dom.body || dom.documentElement;
+  // keep the post's subtitle/dek as an opening line when it sits outside the body container
+  const sub = dom.querySelector("[class*='subtitle' i]");
+  const subText = sub && !content.contains(sub) ? htmlToText(sub) : "";
+  content.querySelectorAll("[class*='upsell' i], [class*='promo' i], [class*='planoption' i], [class*='topbar' i], [class*='subscribe' i], [class*='signin' i], [class*='savebadge' i], [class*='viewlink' i], [class*='footer' i], [class*='preamble' i], [class*='preheader' i], [class*='header-' i]")
+    .forEach(el => el.remove());
+  const ADDRESS = /^\d+\s.+,\s.+\s\d{5}(-\d{4})?$/; // "548 Market St PMB 72296, San Francisco, CA 94104"
+  const body = htmlToText(content).split("\n")
+    .filter(l => { const t = l.trim(); return !EMAIL_NOISE.test(t) && !ADDRESS.test(t); }).join("\n")
+    .replace(/\n{3,}/g, "\n\n").trim();
+  return subText && !body.startsWith(subText) ? subText + "\n\n" + body : body;
+}
+function parseHeaders(s) {
+  const h = {};
+  for (const line of s.replace(/\n[ \t]+/g, " ").split("\n")) {
+    const i = line.indexOf(":");
+    if (i > 0) h[line.slice(0, i).trim().toLowerCase()] = line.slice(i + 1).trim();
+  }
+  return h;
+}
+function bytesToText(bytes, charset) {
+  try { return new TextDecoder(charset || "utf-8").decode(bytes); }
+  catch (e) { return new TextDecoder("utf-8").decode(bytes); }
+}
+function qpDecode(s, charset) {
+  s = s.replace(/=\n/g, "");
+  const bytes = new Uint8Array(s.length);
+  let n = 0;
+  for (let i = 0; i < s.length; i++) {
+    if (s[i] === "=" && /^[0-9A-Fa-f]{2}$/.test(s.substr(i + 1, 2))) { bytes[n++] = parseInt(s.substr(i + 1, 2), 16); i += 2; }
+    else bytes[n++] = s.charCodeAt(i) & 0xff;
+  }
+  return bytesToText(bytes.subarray(0, n), charset);
+}
+function b64ToText(s, charset) {
+  const bin = atob(s.replace(/[^A-Za-z0-9+/=]/g, ""));
+  const bytes = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+  return bytesToText(bytes, charset);
+}
+function decodeMimeWords(s) {
+  return s.replace(/=\?([^?]+)\?([BbQq])\?([^?]*)\?=/g, (m, cs, enc, data) =>
+    enc.toUpperCase() === "B" ? b64ToText(data, cs) : qpDecode(data.replace(/_/g, " "), cs));
+}
+function decodePartBody(body, headers) {
+  const cte = (headers["content-transfer-encoding"] || "").toLowerCase();
+  const cs = ((headers["content-type"] || "").match(/charset="?([\w.-]+)"?/i) || [])[1];
+  if (cte.includes("base64")) return b64ToText(body, cs);
+  if (cte.includes("quoted-printable")) return qpDecode(body, cs);
+  return body;
+}
+function findTextPart(headers, body) {
+  const ct = (headers["content-type"] || "text/plain").toLowerCase();
+  const boundary = ((headers["content-type"] || "").match(/boundary="?([^";\n]+)"?/i) || [])[1];
+  if (ct.startsWith("multipart") && boundary) {
+    let best = null;
+    for (const piece of body.split("--" + boundary)) {
+      const i = piece.indexOf("\n\n");
+      if (i < 0) continue;
+      const ph = parseHeaders(piece.slice(0, i));
+      if (!ph["content-type"] && !ph["content-transfer-encoding"]) continue;
+      const found = findTextPart(ph, piece.slice(i + 2));
+      if (found && (!best || (found.type === "html" && best.type !== "html"))) best = found;
+    }
+    return best;
+  }
+  if (ct.startsWith("text/html")) return { type: "html", text: decodePartBody(body, headers) };
+  if (ct.startsWith("text/plain")) return { type: "plain", text: decodePartBody(body, headers) };
+  return null;
+}
+async function emlToDoc(file) {
+  const raw = (await file.text()).replace(/\r\n/g, "\n");
+  const i = raw.indexOf("\n\n");
+  if (i < 0) throw new Error("that doesn't look like a saved email (.eml)");
+  const headers = parseHeaders(raw.slice(0, i));
+  const part = findTextPart(headers, raw.slice(i + 2));
+  if (!part) throw new Error("couldn't find readable content in this email");
+  const title = decodeMimeWords(headers["subject"] || "") || file.name;
+  const text = part.type === "html" ? emailHtmlToText(part.text) : cleanText(part.text);
+  return { title, text };
+}
+
+/* ---------- EPUB import (pure JS: zip + spine, no libraries) ---------- */
+async function unzip(buf) {
+  const dv = new DataView(buf);
+  let e = buf.byteLength - 22;
+  const stop = Math.max(0, e - 65558);
+  while (e >= stop && dv.getUint32(e, true) !== 0x06054b50) e--;
+  if (e < stop) throw new Error("not a valid EPUB file");
+  const count = dv.getUint16(e + 10, true);
+  let off = dv.getUint32(e + 16, true);
+  const entries = {};
+  for (let i = 0; i < count; i++) {
+    if (dv.getUint32(off, true) !== 0x02014b50) break;
+    const method = dv.getUint16(off + 10, true);
+    const csize = dv.getUint32(off + 20, true);
+    const nlen = dv.getUint16(off + 28, true);
+    const elen = dv.getUint16(off + 30, true);
+    const clen = dv.getUint16(off + 32, true);
+    const lho = dv.getUint32(off + 42, true);
+    const name = new TextDecoder().decode(new Uint8Array(buf, off + 46, nlen));
+    entries[name] = { method, csize, lho };
+    off += 46 + nlen + elen + clen;
+  }
+  return {
+    has: (name) => name in entries,
+    read: async (name) => {
+      const ent = entries[name];
+      if (!ent) return null;
+      const ldv = new DataView(buf, ent.lho);
+      const start = ent.lho + 30 + ldv.getUint16(26, true) + ldv.getUint16(28, true);
+      const data = new Uint8Array(buf, start, ent.csize);
+      if (ent.method === 0) return new TextDecoder().decode(data);
+      if (ent.method !== 8) throw new Error("unsupported compression inside this EPUB");
+      const stream = new Blob([data]).stream().pipeThrough(new DecompressionStream("deflate-raw"));
+      return await new Response(stream).text();
+    }
+  };
+}
+function joinPath(dir, href) {
+  const out = [];
+  for (const p of (dir + href).split("/")) {
+    if (p === "..") out.pop();
+    else if (p !== "." && p !== "") out.push(p);
+  }
+  return out.join("/");
+}
+async function epubToDoc(file) {
+  const zip = await unzip(await file.arrayBuffer());
+  const container = await zip.read("META-INF/container.xml");
+  if (!container) throw new Error("no container.xml — this isn't a standard EPUB");
+  const cx = new DOMParser().parseFromString(container, "application/xml");
+  const opfPath = cx.getElementsByTagName("rootfile")[0] && cx.getElementsByTagName("rootfile")[0].getAttribute("full-path");
+  const opfRaw = opfPath && await zip.read(opfPath);
+  if (!opfRaw) throw new Error("couldn't read the EPUB package file");
+  const opf = new DOMParser().parseFromString(opfRaw, "application/xml");
+  const dir = opfPath.includes("/") ? opfPath.slice(0, opfPath.lastIndexOf("/") + 1) : "";
+  const manifest = {};
+  for (const it of opf.getElementsByTagName("item")) manifest[it.getAttribute("id")] = it.getAttribute("href");
+  const titleEl = opf.getElementsByTagNameNS("*", "title")[0];
+  const title = (titleEl && titleEl.textContent.trim()) || file.name.replace(/\.epub$/i, "");
+  let text = "";
+  for (const ref of opf.getElementsByTagName("itemref")) {
+    const href = manifest[ref.getAttribute("idref")];
+    if (!href) continue;
+    const raw = await zip.read(joinPath(dir, decodeURIComponent(href.split("#")[0])));
+    if (!raw) continue;
+    const doc = new DOMParser().parseFromString(raw, "text/html");
+    const t = htmlToText(doc.body || doc.documentElement);
+    if (t) text += t + "\n\n";
+  }
+  if (!text.trim() && zip.has("META-INF/encryption.xml"))
+    throw new Error("this EPUB is DRM-protected and can't be imported");
+  return { title, text };
+}
 
 /* PDF extraction via pdf.js, loaded on demand */
 let pdfjsReady = null;
