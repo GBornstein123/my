@@ -1,0 +1,596 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#0e0f13">
+<title>readrrr — focus reader</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icon-180.png">
+<link rel="icon" type="image/png" href="icon-192.png">
+<style>
+  :root {
+    --bg: #f6f5f2; --fg: #1b1b20; --muted: #6d6d78; --card: #ffffff;
+    --border: #e5e3dd; --accent: #e0492f; --accent-soft: rgba(224,73,47,.10);
+    --guide: #c9c7c0;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0e0f13; --fg: #ececf1; --muted: #8b8b96; --card: #17181e;
+      --border: #262731; --accent: #ff6b4a; --accent-soft: rgba(255,107,74,.12);
+      --guide: #3a3b46;
+    }
+  }
+  :root[data-theme="light"] {
+    --bg: #f6f5f2; --fg: #1b1b20; --muted: #6d6d78; --card: #ffffff;
+    --border: #e5e3dd; --accent: #e0492f; --accent-soft: rgba(224,73,47,.10);
+    --guide: #c9c7c0;
+  }
+  :root[data-theme="dark"] {
+    --bg: #0e0f13; --fg: #ececf1; --muted: #8b8b96; --card: #17181e;
+    --border: #262731; --accent: #ff6b4a; --accent-soft: rgba(255,107,74,.12);
+    --guide: #3a3b46;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+  html, body { height: 100%; }
+  body {
+    background: var(--bg); color: var(--fg);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    overscroll-behavior: none;
+    padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+    -webkit-user-select: none; user-select: none;
+  }
+  .screen { display: none; flex-direction: column; height: 100dvh; max-width: 640px; margin: 0 auto; }
+  .screen.active { display: flex; }
+
+  /* ---------- header ---------- */
+  header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 16px 20px 8px;
+  }
+  header h1 { font-size: 22px; font-weight: 800; letter-spacing: -0.5px; }
+  header h1 .dot { color: var(--accent); }
+  .hbtns { display: flex; gap: 8px; }
+  .iconbtn {
+    width: 40px; height: 40px; border-radius: 12px; border: 1px solid var(--border);
+    background: var(--card); color: var(--fg); font-size: 17px;
+    display: flex; align-items: center; justify-content: center; cursor: pointer;
+  }
+  .iconbtn:active { background: var(--accent-soft); }
+
+  /* ---------- library ---------- */
+  #library-list { flex: 1; overflow-y: auto; padding: 8px 20px 100px; }
+  .doc {
+    background: var(--card); border: 1px solid var(--border); border-radius: 16px;
+    padding: 16px; margin-bottom: 12px; cursor: pointer; position: relative;
+  }
+  .doc:active { border-color: var(--accent); }
+  .doc h3 { font-size: 16px; font-weight: 700; margin-bottom: 4px; padding-right: 36px;
+            overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .doc .meta { font-size: 13px; color: var(--muted); }
+  .doc .bar { height: 4px; border-radius: 2px; background: var(--border); margin-top: 12px; overflow: hidden; }
+  .doc .bar i { display: block; height: 100%; background: var(--accent); border-radius: 2px; }
+  .doc .del {
+    position: absolute; top: 12px; right: 12px; width: 28px; height: 28px;
+    border: none; background: none; color: var(--muted); font-size: 16px; cursor: pointer;
+  }
+  .empty { text-align: center; color: var(--muted); padding: 60px 30px; font-size: 15px; line-height: 1.6; }
+  #add-btn {
+    position: fixed; bottom: calc(24px + env(safe-area-inset-bottom)); left: 50%; transform: translateX(-50%);
+    width: 60px; height: 60px; border-radius: 30px; border: none;
+    background: var(--accent); color: #fff; font-size: 30px; line-height: 1;
+    box-shadow: 0 6px 20px rgba(0,0,0,.25); cursor: pointer; z-index: 5;
+  }
+
+  /* ---------- add sheet ---------- */
+  #sheet-backdrop {
+    position: fixed; inset: 0; background: rgba(0,0,0,.5); z-index: 10;
+    display: none; align-items: flex-end; justify-content: center;
+  }
+  #sheet-backdrop.open { display: flex; }
+  #sheet {
+    background: var(--card); border-radius: 20px 20px 0 0; width: 100%; max-width: 640px;
+    padding: 20px 20px calc(28px + env(safe-area-inset-bottom));
+  }
+  #sheet h2 { font-size: 18px; margin-bottom: 16px; }
+  .sheet-row {
+    display: flex; align-items: center; gap: 14px; width: 100%;
+    background: none; border: 1px solid var(--border); border-radius: 14px;
+    padding: 16px; margin-bottom: 10px; color: var(--fg); font-size: 16px; cursor: pointer; text-align: left;
+  }
+  .sheet-row:active { background: var(--accent-soft); }
+  .sheet-row .ic { font-size: 20px; }
+  .sheet-row small { display: block; color: var(--muted); font-size: 12.5px; margin-top: 2px; }
+  #paste-area {
+    width: 100%; min-height: 140px; background: var(--bg); color: var(--fg);
+    border: 1px solid var(--border); border-radius: 14px; padding: 12px;
+    font: inherit; font-size: 15px; resize: vertical; margin-bottom: 10px;
+    -webkit-user-select: text; user-select: text;
+  }
+  .primary {
+    width: 100%; padding: 15px; border-radius: 14px; border: none;
+    background: var(--accent); color: #fff; font-size: 16px; font-weight: 700; cursor: pointer;
+  }
+  .hidden { display: none !important; }
+
+  /* ---------- reader ---------- */
+  #reader { background: var(--bg); }
+  #reader header { padding: 12px 16px; }
+  #r-title { flex: 1; text-align: center; font-size: 14px; font-weight: 600; color: var(--muted);
+             overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding: 0 10px; }
+  #r-pct { font-size: 13px; color: var(--muted); min-width: 40px; text-align: right; }
+
+  #stage { flex: 1; display: flex; align-items: center; justify-content: center; position: relative; cursor: pointer; }
+  #focus-box { position: relative; width: 100%; height: 120px; }
+  .guide { position: absolute; left: 38%; width: 2px; height: 14px; background: var(--guide); }
+  .guide.top { top: 8px; } .guide.bot { bottom: 8px; }
+  .rail { position: absolute; left: 8%; right: 8%; height: 1px; background: var(--guide); opacity: .5; }
+  .rail.top { top: 0; } .rail.bot { bottom: 0; }
+  #word {
+    position: absolute; top: 50%; left: 38%; transform: translateY(-50%);
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: clamp(28px, 9vw, 44px); font-weight: 600; white-space: pre;
+  }
+  #word .orp { color: var(--accent); }
+  #tap-hint {
+    position: absolute; bottom: -46px; left: 0; right: 0; text-align: center;
+    color: var(--muted); font-size: 13px;
+  }
+
+  #controls { padding: 0 20px calc(20px + env(safe-area-inset-bottom)); }
+  #scrub { width: 100%; accent-color: var(--accent); height: 28px; }
+  .ctl-row { display: flex; align-items: center; justify-content: center; gap: 14px; margin-top: 6px; }
+  .ctl {
+    width: 52px; height: 52px; border-radius: 16px; border: 1px solid var(--border);
+    background: var(--card); color: var(--fg); font-size: 18px; cursor: pointer;
+  }
+  .ctl:active { background: var(--accent-soft); }
+  #play {
+    width: 68px; height: 68px; border-radius: 34px; border: none;
+    background: var(--accent); color: #fff; font-size: 24px; cursor: pointer;
+  }
+  #wpm-box { text-align: center; margin-top: 10px; font-size: 13px; color: var(--muted); }
+  #wpm-box b { color: var(--fg); font-size: 15px; }
+
+  /* ---------- stats ---------- */
+  #stats-body { flex: 1; overflow-y: auto; padding: 8px 20px 40px; }
+  .stat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .stat {
+    background: var(--card); border: 1px solid var(--border); border-radius: 16px; padding: 18px 16px;
+  }
+  .stat .v { font-size: 26px; font-weight: 800; letter-spacing: -0.5px; }
+  .stat .v span { font-size: 14px; font-weight: 600; color: var(--muted); }
+  .stat .l { font-size: 12.5px; color: var(--muted); margin-top: 4px; }
+  .stat.wide { grid-column: 1 / -1; }
+  .note { color: var(--muted); font-size: 13px; line-height: 1.6; margin-top: 20px; }
+</style>
+</head>
+<body>
+
+<!-- ============ LIBRARY ============ -->
+<div class="screen active" id="library">
+  <header>
+    <h1>readrrr<span class="dot">.</span></h1>
+    <div class="hbtns">
+      <button class="iconbtn" id="theme-btn" title="Theme">◐</button>
+      <button class="iconbtn" id="stats-btn" title="Stats">▤</button>
+    </div>
+  </header>
+  <div id="library-list"></div>
+  <button id="add-btn" title="Add text">+</button>
+</div>
+
+<!-- ============ READER ============ -->
+<div class="screen" id="reader">
+  <header>
+    <button class="iconbtn" id="back-btn">‹</button>
+    <div id="r-title"></div>
+    <div id="r-pct"></div>
+  </header>
+  <div id="stage">
+    <div id="focus-box">
+      <div class="rail top"></div><div class="rail bot"></div>
+      <div class="guide top"></div><div class="guide bot"></div>
+      <div id="word"></div>
+      <div id="tap-hint">tap to start</div>
+    </div>
+  </div>
+  <div id="controls">
+    <input type="range" id="scrub" min="0" max="100" value="0">
+    <div class="ctl-row">
+      <button class="ctl" id="wpm-down" title="Slower">−</button>
+      <button class="ctl" id="rewind" title="Back one sentence">↺</button>
+      <button id="play">▶</button>
+      <button class="ctl" id="restart" title="Restart">⇤</button>
+      <button class="ctl" id="wpm-up" title="Faster">+</button>
+    </div>
+    <div id="wpm-box"><b id="wpm-val">300</b> words / min</div>
+  </div>
+</div>
+
+<!-- ============ STATS ============ -->
+<div class="screen" id="stats">
+  <header>
+    <button class="iconbtn" id="stats-back">‹</button>
+    <h1 style="font-size:18px">Your reading</h1>
+    <div style="width:40px"></div>
+  </header>
+  <div id="stats-body">
+    <div class="stat-grid">
+      <div class="stat wide"><div class="v" id="s-streak">0<span> day streak</span></div><div class="l">Read every day to keep it going</div></div>
+      <div class="stat"><div class="v" id="s-words">0</div><div class="l">words read</div></div>
+      <div class="stat"><div class="v" id="s-time">0<span> min</span></div><div class="l">time in focus</div></div>
+      <div class="stat"><div class="v" id="s-avg">–</div><div class="l">average speed (wpm)</div></div>
+      <div class="stat"><div class="v" id="s-best">–</div><div class="l">top speed used (wpm)</div></div>
+      <div class="stat"><div class="v" id="s-sessions">0</div><div class="l">sessions</div></div>
+      <div class="stat"><div class="v" id="s-docs">0</div><div class="l">documents finished</div></div>
+    </div>
+    <p class="note">A typical reader averages ~230 wpm. With RSVP, most people comfortably reach 400–600 wpm after a week of practice. Nudge speed up a little each session.</p>
+  </div>
+</div>
+
+<!-- ============ ADD SHEET ============ -->
+<div id="sheet-backdrop">
+  <div id="sheet">
+    <h2>Add something to read</h2>
+    <div id="sheet-main">
+      <button class="sheet-row" id="row-paste"><span class="ic">✍️</span><span>Paste text<small>Articles, notes, emails — anything</small></span></button>
+      <button class="sheet-row" id="row-file"><span class="ic">📄</span><span>Import a file<small>PDF, .txt or .md</small></span></button>
+      <input type="file" id="file-input" accept=".txt,.md,.pdf,text/plain,application/pdf" class="hidden">
+    </div>
+    <div id="sheet-paste" class="hidden">
+      <textarea id="paste-area" placeholder="Paste your text here…"></textarea>
+      <button class="primary" id="paste-save">Start reading</button>
+    </div>
+  </div>
+</div>
+
+<script>
+"use strict";
+/* ================= storage ================= */
+const LS_KEY = "readrrr-v1";
+const store = load();
+function load() {
+  try { const s = JSON.parse(localStorage.getItem(LS_KEY)); if (s && s.docs) return s; } catch (e) {}
+  return {
+    docs: [],
+    wpm: 300,
+    theme: "",
+    stats: { words: 0, ms: 0, sessions: 0, bestWpm: 0, finished: 0, streak: 0, lastDay: "" }
+  };
+}
+let saveT = null;
+function save() {
+  clearTimeout(saveT);
+  saveT = setTimeout(() => {
+    try { localStorage.setItem(LS_KEY, JSON.stringify(store)); }
+    catch (e) { alert("Couldn't save — storage is full. Delete a document and try again."); }
+  }, 150);
+}
+
+/* seed a welcome doc on first launch */
+if (!store.docs.length && !store.stats.words) {
+  addDoc("Welcome to readrrr 👋",
+    "This is readrrr, your focus reader. Instead of moving your eyes across lines of text, readrrr streams words to you one at a time, anchored at a single focus point.\n\n" +
+    "The highlighted letter marks the spot your eye locks onto. Because your eyes never move, your brain skips the slow mechanics of reading and just absorbs meaning.\n\n" +
+    "Tap the screen or the play button to start and stop. Use plus and minus to change speed. Start around 300 words per minute. When it feels easy, nudge it up. Most people are comfortable at 450 or more within a few days.\n\n" +
+    "If you zone out, tap the rewind button to jump back one sentence. Drag the slider to scrub anywhere in the text.\n\n" +
+    "To add your own reading, go back to the library and tap the plus button. You can paste any text or import a PDF. Your progress and stats are saved on this device automatically.\n\n" +
+    "That's everything. Happy reading.");
+}
+
+/* ================= helpers ================= */
+const $ = (id) => document.getElementById(id);
+function tokenize(text) {
+  const words = [];
+  const paras = text.replace(/\r/g, "").split(/\n\s*\n/);
+  for (const p of paras) {
+    const toks = p.split(/\s+/).filter(Boolean);
+    for (let t of toks) {
+      while (t.length > 16) { words.push({ t: t.slice(0, 14) + "–", p: false }); t = t.slice(14); }
+      words.push({ t, p: false });
+    }
+    if (words.length) words[words.length - 1].p = true; // paragraph break
+  }
+  return words;
+}
+function addDoc(title, text) {
+  const wc = text.split(/\s+/).filter(Boolean).length;
+  const doc = { id: Date.now() + "" + Math.floor(Math.random() * 1e4),
+                title: title.slice(0, 120), text, wc, pos: 0, added: Date.now() };
+  store.docs.unshift(doc); save();
+  return doc;
+}
+function fmtCount(n) { return n >= 10000 ? (n / 1000).toFixed(n >= 100000 ? 0 : 1) + "k" : String(n); }
+function today() { return new Date().toDateString(); }
+
+/* ================= theme ================= */
+function applyTheme() { document.documentElement.dataset.theme = store.theme; }
+applyTheme();
+$("theme-btn").onclick = () => {
+  const dark = matchMedia("(prefers-color-scheme: dark)").matches;
+  const cur = store.theme || (dark ? "dark" : "light");
+  store.theme = cur === "dark" ? "light" : "dark";
+  applyTheme(); save();
+};
+
+/* ================= navigation ================= */
+function show(id) {
+  document.querySelectorAll(".screen").forEach(s => s.classList.remove("active"));
+  $(id).classList.add("active");
+}
+
+/* ================= library ================= */
+function renderLibrary() {
+  const list = $("library-list");
+  list.innerHTML = "";
+  if (!store.docs.length) {
+    list.innerHTML = '<div class="empty">Nothing here yet.<br>Tap <b>+</b> to paste text or import a PDF,<br>then read it hands-free.</div>';
+    return;
+  }
+  for (const d of store.docs) {
+    const pct = d.wc ? Math.min(100, Math.round(100 * d.pos / d.wc)) : 0;
+    const el = document.createElement("div");
+    el.className = "doc";
+    el.innerHTML =
+      "<h3></h3>" +
+      `<div class="meta">${fmtCount(d.wc)} words · ${pct >= 100 ? "finished ✓" : pct > 0 ? pct + "% read" : "not started"} · ~${Math.max(1, Math.round(d.wc / store.wpm))} min at ${store.wpm} wpm</div>` +
+      `<div class="bar"><i style="width:${pct}%"></i></div>` +
+      '<button class="del" title="Delete">✕</button>';
+    el.querySelector("h3").textContent = d.title;
+    el.querySelector(".del").onclick = (e) => {
+      e.stopPropagation();
+      if (confirm(`Delete “${d.title}”?`)) {
+        store.docs = store.docs.filter(x => x.id !== d.id); save(); renderLibrary();
+      }
+    };
+    el.onclick = () => openReader(d);
+    list.appendChild(el);
+  }
+}
+
+/* ================= add sheet ================= */
+const backdrop = $("sheet-backdrop");
+function openSheet() { backdrop.classList.add("open"); $("sheet-main").classList.remove("hidden"); $("sheet-paste").classList.add("hidden"); }
+function closeSheet() { backdrop.classList.remove("open"); $("paste-area").value = ""; }
+$("add-btn").onclick = openSheet;
+backdrop.onclick = (e) => { if (e.target === backdrop) closeSheet(); };
+$("row-paste").onclick = () => { $("sheet-main").classList.add("hidden"); $("sheet-paste").classList.remove("hidden"); $("paste-area").focus(); };
+$("paste-save").onclick = () => {
+  const text = $("paste-area").value.trim();
+  if (!text) return;
+  const firstLine = text.split("\n")[0].split(/\s+/).slice(0, 8).join(" ");
+  const doc = addDoc(firstLine || "Pasted text", text);
+  closeSheet(); openReader(doc);
+};
+$("row-file").onclick = () => $("file-input").click();
+$("file-input").onchange = async (e) => {
+  const f = e.target.files[0];
+  e.target.value = "";
+  if (!f) return;
+  try {
+    let text;
+    if (/\.pdf$/i.test(f.name) || f.type === "application/pdf") text = await pdfToText(f);
+    else text = await f.text();
+    text = (text || "").trim();
+    if (!text) { alert("Couldn't find any text in that file."); return; }
+    const doc = addDoc(f.name.replace(/\.(pdf|txt|md)$/i, ""), text);
+    closeSheet(); openReader(doc);
+  } catch (err) {
+    alert("Import failed: " + (err && err.message ? err.message : err));
+  }
+};
+
+/* PDF extraction via pdf.js, loaded on demand */
+let pdfjsReady = null;
+function loadScript(src) {
+  return new Promise((res, rej) => {
+    const s = document.createElement("script");
+    s.src = src; s.onload = res; s.onerror = () => rej(new Error("network blocked"));
+    document.head.appendChild(s);
+  });
+}
+async function pdfToText(file) {
+  const BASE = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/";
+  if (!pdfjsReady) pdfjsReady = loadScript(BASE + "pdf.min.js");
+  try { await pdfjsReady; } catch (e) {
+    pdfjsReady = null;
+    throw new Error("PDF import needs an internet connection here. Paste the text instead.");
+  }
+  const pdfjs = window["pdfjs-dist/build/pdf"];
+  pdfjs.GlobalWorkerOptions.workerSrc = BASE + "pdf.worker.min.js";
+  const buf = await file.arrayBuffer();
+  const pdf = await pdfjs.getDocument({ data: buf }).promise;
+  let out = "";
+  for (let i = 1; i <= pdf.numPages; i++) {
+    const page = await pdf.getPage(i);
+    const content = await page.getTextContent();
+    let line = "", last = null;
+    for (const item of content.items) {
+      if (last && Math.abs(item.transform[5] - last.transform[5]) > 2) { out += line.trim() + "\n"; line = ""; }
+      line += item.str + (item.hasEOL ? "\n" : " ");
+      last = item;
+    }
+    out += line.trim() + "\n\n";
+  }
+  return out;
+}
+
+/* ================= reader / RSVP engine ================= */
+const R = { doc: null, words: [], idx: 0, playing: false, timer: null,
+            sessStart: 0, sessWords: 0 };
+
+function openReader(doc) {
+  R.doc = doc;
+  R.words = tokenize(doc.text);
+  R.idx = Math.min(doc.pos, Math.max(0, R.words.length - 1));
+  if (R.idx >= R.words.length - 1 && doc.pos >= doc.wc) R.idx = 0; // reopen finished doc from top
+  $("r-title").textContent = doc.title;
+  const scrub = $("scrub");
+  scrub.max = Math.max(0, R.words.length - 1);
+  scrub.value = R.idx;
+  $("tap-hint").style.display = "";
+  show("reader");
+  renderWord(); updateHud();
+}
+
+/* optimal recognition point — the letter your eye anchors on */
+function orpIndex(w) {
+  const len = w.length;
+  if (len <= 1) return 0;
+  if (len <= 5) return 1;
+  if (len <= 9) return 2;
+  if (len <= 13) return 3;
+  return 4;
+}
+function renderWord() {
+  const wordEl = $("word");
+  const w = R.words[R.idx];
+  if (!w) { wordEl.textContent = ""; return; }
+  const t = w.t, o = orpIndex(t);
+  const pre = t.slice(0, o), orp = t.charAt(o), post = t.slice(o + 1);
+  wordEl.innerHTML = "";
+  const s1 = document.createElement("span"); s1.textContent = pre;
+  const s2 = document.createElement("span"); s2.className = "orp"; s2.textContent = orp;
+  const s3 = document.createElement("span"); s3.textContent = post;
+  wordEl.append(s1, s2, s3);
+  wordEl.style.transform = `translateY(-50%) translateX(${-(o + 0.5)}ch)`;
+}
+function wordDelay(w) {
+  const base = 60000 / store.wpm;
+  let m = 1;
+  const t = w.t;
+  if (t.length >= 9) m += 0.3;
+  if (/\d/.test(t)) m += 0.3;
+  if (/[.!?…]["”')\]]*$/.test(t)) m += 1.4;
+  else if (/[,;:—–]["”')\]]*$/.test(t)) m += 0.6;
+  if (w.p) m += 1.2;
+  return base * m;
+}
+function tick() {
+  if (!R.playing) return;
+  if (R.idx >= R.words.length) { finishDoc(); return; }
+  renderWord(); updateHud();
+  const d = wordDelay(R.words[R.idx]);
+  R.idx++;
+  R.sessWords++;
+  R.timer = setTimeout(tick, d);
+}
+function play() {
+  if (R.playing || !R.words.length) return;
+  if (R.idx >= R.words.length) R.idx = 0;
+  R.playing = true;
+  R.sessStart = Date.now();
+  R.sessWords = 0;
+  $("play").textContent = "❚❚";
+  $("tap-hint").style.display = "none";
+  renderWord();
+  R.timer = setTimeout(tick, 400); // brief settle before the stream starts
+}
+function pause() {
+  if (!R.playing) return;
+  R.playing = false;
+  clearTimeout(R.timer);
+  $("play").textContent = "▶";
+  commitSession();
+  saveProgress();
+}
+function commitSession(force) {
+  const ms = Date.now() - R.sessStart;
+  if (!force && (ms < 1500 || R.sessWords < 3)) return; // ignore blips
+  const st = store.stats;
+  st.words += R.sessWords;
+  st.ms += ms;
+  st.sessions += 1;
+  st.bestWpm = Math.max(st.bestWpm, store.wpm);
+  const d = today();
+  if (st.lastDay !== d) {
+    const y = new Date(); y.setDate(y.getDate() - 1);
+    st.streak = st.lastDay === y.toDateString() ? st.streak + 1 : 1;
+    st.lastDay = d;
+  }
+  save();
+}
+function saveProgress() {
+  if (!R.doc) return;
+  R.doc.pos = Math.min(R.idx, R.doc.wc);
+  save();
+}
+function finishDoc() {
+  R.playing = false;
+  $("play").textContent = "▶";
+  commitSession(true);
+  R.idx = R.words.length;
+  R.doc.pos = R.doc.wc;
+  store.stats.finished += 1;
+  save();
+  $("word").innerHTML = '<span class="orp">✓ done</span>';
+  $("word").style.transform = "translateY(-50%) translateX(-3ch)";
+  updateHud();
+}
+function updateHud() {
+  const n = Math.max(1, R.words.length);
+  $("r-pct").textContent = Math.min(100, Math.round(100 * R.idx / n)) + "%";
+  $("scrub").value = Math.min(R.idx, R.words.length - 1);
+  $("wpm-val").textContent = store.wpm;
+}
+function sentenceBack() {
+  let i = Math.max(0, R.idx - 2);
+  while (i > 0 && !/[.!?…]["”')\]]*$/.test(R.words[i - 1].t)) i--;
+  R.idx = i;
+  renderWord(); updateHud(); saveProgress();
+}
+
+/* controls */
+$("play").onclick = () => R.playing ? pause() : play();
+$("stage").onclick = () => R.playing ? pause() : play();
+$("rewind").onclick = (e) => { e.stopPropagation(); sentenceBack(); };
+$("restart").onclick = () => { pause(); R.idx = 0; renderWord(); updateHud(); saveProgress(); };
+$("wpm-up").onclick = () => { store.wpm = Math.min(1200, store.wpm + 25); save(); updateHud(); };
+$("wpm-down").onclick = () => { store.wpm = Math.max(100, store.wpm - 25); save(); updateHud(); };
+$("scrub").oninput = (e) => {
+  pause();
+  R.idx = +e.target.value;
+  renderWord(); updateHud();
+};
+$("scrub").onchange = saveProgress;
+$("back-btn").onclick = () => { pause(); renderLibrary(); show("library"); };
+
+/* keyboard (desktop nicety) */
+document.addEventListener("keydown", (e) => {
+  if (!$("reader").classList.contains("active")) return;
+  if (e.code === "Space") { e.preventDefault(); R.playing ? pause() : play(); }
+  if (e.key === "ArrowUp") $("wpm-up").click();
+  if (e.key === "ArrowDown") $("wpm-down").click();
+  if (e.key === "ArrowLeft") sentenceBack();
+});
+
+/* persist when leaving */
+document.addEventListener("visibilitychange", () => { if (document.hidden) pause(); });
+window.addEventListener("pagehide", () => { if (R.playing) pause(); });
+
+/* ================= stats ================= */
+function renderStats() {
+  const st = store.stats;
+  $("s-streak").innerHTML = st.streak + "<span> day streak</span>";
+  $("s-words").textContent = fmtCount(st.words);
+  $("s-time").innerHTML = Math.round(st.ms / 60000) + "<span> min</span>";
+  $("s-avg").textContent = st.ms > 5000 ? Math.round(st.words / (st.ms / 60000)) : "–";
+  $("s-best").textContent = st.bestWpm || "–";
+  $("s-sessions").textContent = st.sessions;
+  $("s-docs").textContent = st.finished;
+}
+$("stats-btn").onclick = () => { renderStats(); show("stats"); };
+$("stats-back").onclick = () => { renderLibrary(); show("library"); };
+
+/* ================= boot ================= */
+renderLibrary();
+if ("serviceWorker" in navigator && location.protocol === "https:") {
+  navigator.serviceWorker.register("sw.js").catch(() => {});
+}
+</script>
+</body>
+</html>
