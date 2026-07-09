@@ -17,6 +17,9 @@ your brain skips the mechanics of reading and just absorbs meaning.
   open the email → ⋮ → "Download message") and import it; the reader decodes the
   MIME message, finds the article body, and strips subscribe buttons, upsells,
   and footers
+- **Direct Gmail import** — connect your Gmail (read-only, entirely in-browser;
+  no server ever sees your mail) and pull newsletters into the library with one
+  tap. See [Gmail setup](#gmail-setup) below
 - **EPUB books** — full spine-ordered chapter extraction with a dependency-free
   zip reader (browser-native `DecompressionStream`). Kindle purchases
   (`.azw`/`.kfx`) are DRM-locked by Amazon and cannot be imported; use DRM-free
@@ -48,3 +51,28 @@ native app and works offline after the first visit.
 
 For GitHub Pages: enable Pages for this repo (Settings → Pages → deploy from
 branch), and the app will be served at `https://<user>.github.io/<repo>/readrrr/`.
+
+## Gmail setup
+
+The "Import from Gmail" button talks to the Gmail API straight from your
+browser with a read-only scope — there is no backend, and the access token
+never leaves the page. Google requires the app to present its own OAuth
+credential, so a one-time setup (~10 minutes, free) is needed:
+
+1. Go to [console.cloud.google.com](https://console.cloud.google.com) and
+   create a project (any name)
+2. **APIs & Services → Library** → search "Gmail API" → **Enable**
+3. **APIs & Services → OAuth consent screen** → External → fill in the app
+   name and your email → under **Test users**, add your own Gmail address
+   (the app can stay in "Testing" mode forever for personal use)
+4. **APIs & Services → Credentials → Create credentials → OAuth client ID** →
+   Application type **Web application** → under **Authorized JavaScript
+   origins** add the origin you open the app from, e.g.
+   `https://<user>.github.io` (and `http://localhost:8000` for local testing)
+5. In the app: **+ → Import from Gmail** → paste the client ID → Connect
+
+Then sign in with Google when prompted; the app lists your newsletter emails
+(default search `from:substack.com`, editable — any Gmail search works) and a
+tap imports the cleaned article. Note the Gmail button needs the app to be
+served from an origin you whitelisted — it won't work from `file://` or from
+the claude.ai artifact preview (its sandbox blocks requests to Google).

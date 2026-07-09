@@ -115,6 +115,25 @@
     background: var(--accent); color: #fff; font-size: 16px; font-weight: 700; cursor: pointer;
   }
   .hidden { display: none !important; }
+  .field {
+    width: 100%; background: var(--bg); color: var(--fg);
+    border: 1px solid var(--border); border-radius: 14px; padding: 13px 12px;
+    font: inherit; font-size: 15px; margin-bottom: 10px;
+    -webkit-user-select: text; user-select: text;
+  }
+  .linkbtn {
+    display: block; width: 100%; background: none; border: none; color: var(--muted);
+    font-size: 13px; padding: 12px 0 0; cursor: pointer; text-align: center; text-decoration: underline;
+  }
+  #gmail-list { max-height: 40dvh; overflow-y: auto; }
+  .mail {
+    width: 100%; text-align: left; background: none; border: 1px solid var(--border);
+    border-radius: 14px; padding: 12px 14px; margin-bottom: 8px; color: var(--fg); cursor: pointer;
+  }
+  .mail:active { background: var(--accent-soft); }
+  .mail b { display: block; font-size: 14.5px; margin-bottom: 2px; }
+  .mail small { color: var(--muted); font-size: 12.5px; }
+  .mail.done { border-color: var(--accent); }
 
   /* ---------- reader ---------- */
   #reader { background: var(--bg); }
@@ -239,12 +258,35 @@
     <div id="sheet-main">
       <button class="sheet-row" id="row-paste"><span class="ic">✍️</span><span>Paste text<small>Articles, notes, emails — anything</small></span></button>
       <button class="sheet-row" id="row-file"><span class="ic">📄</span><span>Import a file<small>PDF, EPUB, email (.eml), .html, .txt, .md</small></span></button>
+      <button class="sheet-row" id="row-gmail"><span class="ic">📬</span><span>Import from Gmail<small>Pull Substack &amp; newsletters straight from your inbox</small></span></button>
       <input type="file" id="file-input" accept=".txt,.md,.pdf,.eml,.epub,.html,.htm,text/plain,application/pdf,message/rfc822,application/epub+zip,text/html" class="hidden">
-      <p class="note" style="margin-top:6px"><b>Substack &amp; paid newsletters:</b> in Gmail on desktop, open the email → ⋮ → “Download message”, then import the .eml here. The reader strips the buttons and footer and keeps the article. On your phone, opening the post, select all, and copy‑paste works too.<br><br><b>Books:</b> DRM‑free EPUBs import fully, chapter by chapter. Kindle purchases (.azw/.kfx) are locked by Amazon’s DRM and can’t be opened outside Kindle apps.</p>
+      <p class="note" style="margin-top:6px"><b>Substack &amp; paid newsletters:</b> connect Gmail above, or save the email (Gmail desktop: ⋮ → “Download message”) and import the .eml. The reader strips the buttons and footer and keeps the article.<br><br><b>Books:</b> DRM‑free EPUBs import fully, chapter by chapter. Kindle purchases (.azw/.kfx) are locked by Amazon’s DRM and can’t be opened outside Kindle apps.</p>
     </div>
     <div id="sheet-paste" class="hidden">
       <textarea id="paste-area" placeholder="Paste your text here…"></textarea>
       <button class="primary" id="paste-save">Start reading</button>
+    </div>
+    <div id="sheet-gmail" class="hidden">
+      <div id="gmail-setup" class="hidden">
+        <p class="note" style="margin:0 0 12px">
+          <b>One-time setup</b> — the app talks to Gmail directly from your browser (read-only; nothing leaves your device), but Google requires it to have its own credential:<br><br>
+          1. Go to <b>console.cloud.google.com</b> → create a project<br>
+          2. <b>APIs &amp; Services → Library</b> → enable the <b>Gmail API</b><br>
+          3. <b>OAuth consent screen</b> → External → add your own Gmail address as a <b>test user</b><br>
+          4. <b>Credentials → Create credentials → OAuth client ID → Web application</b> → under <b>Authorized JavaScript origins</b> add the URL you open this app from (e.g. your GitHub Pages origin)<br>
+          5. Paste the client ID below
+        </p>
+        <input class="field" id="gmail-client-id" placeholder="xxxxxxx.apps.googleusercontent.com" autocomplete="off">
+        <button class="primary" id="gmail-connect">Connect Gmail</button>
+      </div>
+      <div id="gmail-browse" class="hidden">
+        <div style="display:flex; gap:8px; margin-bottom:10px">
+          <input class="field" id="gmail-q" style="margin:0" placeholder="Gmail search, e.g. from:substack.com">
+          <button class="ctl" id="gmail-search" title="Search" style="flex:none">🔍</button>
+        </div>
+        <div id="gmail-list"></div>
+        <button class="linkbtn" id="gmail-reset">Use a different Google account or client ID</button>
+      </div>
     </div>
   </div>
 </div>
@@ -355,7 +397,12 @@ function renderLibrary() {
 
 /* ================= add sheet ================= */
 const backdrop = $("sheet-backdrop");
-function openSheet() { backdrop.classList.add("open"); $("sheet-main").classList.remove("hidden"); $("sheet-paste").classList.add("hidden"); }
+function openSheet() {
+  backdrop.classList.add("open");
+  $("sheet-main").classList.remove("hidden");
+  $("sheet-paste").classList.add("hidden");
+  $("sheet-gmail").classList.add("hidden");
+}
 function closeSheet() { backdrop.classList.remove("open"); $("paste-area").value = ""; }
 $("add-btn").onclick = openSheet;
 backdrop.onclick = (e) => { if (e.target === backdrop) closeSheet(); };
@@ -515,6 +562,142 @@ async function emlToDoc(file) {
   const text = part.type === "html" ? emailHtmlToText(part.text) : cleanText(part.text);
   return { title, text };
 }
+
+/* ---------- Gmail integration (in-browser OAuth, read-only) ---------- */
+const GMAIL_SCOPE = "https://www.googleapis.com/auth/gmail.readonly";
+let gmailToken = null; // access token, kept in memory only
+
+function loadGsi() {
+  return new Promise((res, rej) => {
+    if (window.google && google.accounts && google.accounts.oauth2) return res();
+    const s = document.createElement("script");
+    s.src = "https://accounts.google.com/gsi/client";
+    s.onload = res;
+    s.onerror = () => rej(new Error("couldn't reach Google. Check your connection — and note this only works in the hosted app, not the claude.ai preview."));
+    document.head.appendChild(s);
+  });
+}
+async function gmailAuth() {
+  if (gmailToken) return;
+  await loadGsi();
+  await new Promise((res, rej) => {
+    google.accounts.oauth2.initTokenClient({
+      client_id: store.gmailClientId,
+      scope: GMAIL_SCOPE,
+      callback: (t) => {
+        if (t && t.access_token) { gmailToken = t.access_token; res(); }
+        else rej(new Error("Google didn't grant access"));
+      },
+      error_callback: (e) => rej(new Error("Google sign-in " + ((e && e.type) || "failed")))
+    }).requestAccessToken();
+  });
+}
+async function gapi(path, params) {
+  const qs = params ? "?" + new URLSearchParams(params) : "";
+  const r = await fetch("https://gmail.googleapis.com/gmail/v1/users/me/" + path + qs,
+                        { headers: { Authorization: "Bearer " + gmailToken } });
+  if (r.status === 401 || r.status === 403) { gmailToken = null; throw new Error("Google session expired — tap search to sign in again"); }
+  if (!r.ok) throw new Error("Gmail returned " + r.status);
+  return r.json();
+}
+function b64urlToText(data) {
+  return b64ToText(data.replace(/-/g, "+").replace(/_/g, "/"), "utf-8");
+}
+function gmailFindPart(payload, want) {
+  if (!payload) return null;
+  if ((payload.mimeType || "").startsWith(want) && payload.body && payload.body.data)
+    return b64urlToText(payload.body.data);
+  for (const p of payload.parts || []) {
+    const r = gmailFindPart(p, want);
+    if (r) return r;
+  }
+  return null;
+}
+async function gmailImportMessage(id) {
+  const msg = await gapi("messages/" + id, { format: "full" });
+  const headers = {};
+  for (const h of (msg.payload && msg.payload.headers) || []) headers[h.name.toLowerCase()] = h.value;
+  const html = gmailFindPart(msg.payload, "text/html");
+  const plain = html ? null : gmailFindPart(msg.payload, "text/plain");
+  const text = html ? emailHtmlToText(html) : cleanText(plain || "");
+  if (!text) throw new Error("no readable text in that email");
+  return addDoc(headers["subject"] || "Email", text);
+}
+async function gmailSearch(q) {
+  const list = await gapi("messages", { q, maxResults: "25" });
+  if (!list.messages || !list.messages.length) return [];
+  const metas = await Promise.all(list.messages.map(m => gapi("messages/" + m.id, new URLSearchParams([
+    ["format", "metadata"], ["metadataHeaders", "Subject"], ["metadataHeaders", "From"], ["metadataHeaders", "Date"]
+  ]))));
+  return metas.map(m => {
+    const h = {};
+    for (const x of (m.payload && m.payload.headers) || []) h[x.name.toLowerCase()] = x.value;
+    return { id: m.id, subject: h["subject"] || "(no subject)", from: (h["from"] || "").replace(/\s*<.*>/, ""), date: (h["date"] || "").split(/ \d\d:/)[0] };
+  });
+}
+
+/* Gmail sheet UI */
+function showGmailSheet() {
+  $("sheet-main").classList.add("hidden");
+  $("sheet-gmail").classList.remove("hidden");
+  const hasId = !!store.gmailClientId;
+  $("gmail-setup").classList.toggle("hidden", hasId);
+  $("gmail-browse").classList.toggle("hidden", !hasId);
+  if (hasId) {
+    $("gmail-q").value = store.gmailQuery || "from:substack.com";
+    runGmailSearch();
+  }
+}
+async function runGmailSearch() {
+  const listEl = $("gmail-list");
+  const q = $("gmail-q").value.trim() || "from:substack.com";
+  store.gmailQuery = q; save();
+  listEl.innerHTML = '<p class="note" style="margin:8px 0">Connecting to Gmail…</p>';
+  try {
+    await gmailAuth();
+    listEl.innerHTML = '<p class="note" style="margin:8px 0">Searching…</p>';
+    const mails = await gmailSearch(q);
+    listEl.innerHTML = "";
+    if (!mails.length) { listEl.innerHTML = '<p class="note" style="margin:8px 0">No emails matched that search.</p>'; return; }
+    for (const m of mails) {
+      const b = document.createElement("button");
+      b.className = "mail";
+      const title = document.createElement("b"); title.textContent = m.subject;
+      const meta = document.createElement("small"); meta.textContent = m.from + " · " + m.date;
+      b.append(title, meta);
+      b.onclick = async () => {
+        title.textContent = "Importing…";
+        try {
+          const doc = await gmailImportMessage(m.id);
+          closeSheet(); openReader(doc);
+        } catch (err) {
+          title.textContent = m.subject;
+          alert("Import failed: " + err.message);
+        }
+      };
+      listEl.appendChild(b);
+    }
+  } catch (err) {
+    listEl.innerHTML = "";
+    const p = document.createElement("p"); p.className = "note"; p.style.margin = "8px 0";
+    p.textContent = "⚠︎ " + err.message;
+    listEl.appendChild(p);
+  }
+}
+$("row-gmail").onclick = showGmailSheet;
+$("gmail-connect").onclick = () => {
+  const id = $("gmail-client-id").value.trim();
+  if (!/\.apps\.googleusercontent\.com$/.test(id)) { alert("That doesn't look like a Google OAuth client ID — it should end in .apps.googleusercontent.com"); return; }
+  store.gmailClientId = id; save();
+  showGmailSheet();
+};
+$("gmail-search").onclick = runGmailSearch;
+$("gmail-q").onkeydown = (e) => { if (e.key === "Enter") runGmailSearch(); };
+$("gmail-reset").onclick = () => {
+  if (!confirm("Forget the saved client ID and sign out?")) return;
+  store.gmailClientId = ""; gmailToken = null; save();
+  showGmailSheet();
+};
 
 /* ---------- EPUB import (pure JS: zip + spine, no libraries) ---------- */
 async function unzip(buf) {
