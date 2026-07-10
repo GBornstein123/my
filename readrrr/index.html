@@ -125,7 +125,15 @@
     display: block; width: 100%; background: none; border: none; color: var(--muted);
     font-size: 13px; padding: 12px 0 0; cursor: pointer; text-align: center; text-decoration: underline;
   }
-  #gmail-list { max-height: 40dvh; overflow-y: auto; }
+  #gmail-list, #drive-list { max-height: 42dvh; overflow-y: auto; }
+  .filter-row { display: flex; gap: 7px; overflow-x: auto; padding: 0 0 10px; scrollbar-width: none; }
+  .filter-row::-webkit-scrollbar { display: none; }
+  .filter-chip {
+    flex: none; border: 1px solid var(--border); border-radius: 999px; padding: 8px 11px;
+    background: var(--card); color: var(--muted); font-size: 12.5px; cursor: pointer;
+  }
+  .filter-chip.active { border-color: var(--accent); background: var(--accent-soft); color: var(--fg); }
+  .load-more { margin-top: 8px; }
   .mail {
     width: 100%; text-align: left; background: none; border: 1px solid var(--border);
     border-radius: 14px; padding: 12px 14px; margin-bottom: 8px; color: var(--fg); cursor: pointer;
@@ -292,10 +300,20 @@
       </div>
       <div id="gmail-browse" class="hidden">
         <div style="display:flex; gap:8px; margin-bottom:10px">
-          <input class="field" id="gmail-q" style="margin:0" placeholder="Gmail search, e.g. from:substack.com">
+          <input class="field" id="gmail-q" style="margin:0" placeholder="Search your entire Gmail">
           <button class="ctl" id="gmail-search" title="Search" style="flex:none">🔍</button>
         </div>
+        <div class="filter-row" id="gmail-filters" aria-label="Gmail filters">
+          <button class="filter-chip active" data-q="">All mail</button>
+          <button class="filter-chip" data-q="in:inbox">Inbox</button>
+          <button class="filter-chip" data-q="is:unread">Unread</button>
+          <button class="filter-chip" data-q="is:starred">Starred</button>
+          <button class="filter-chip" data-q="from:substack.com">Substack</button>
+          <button class="filter-chip" data-q="has:attachment">Attachments</button>
+        </div>
+        <p class="note" id="gmail-status" style="margin:0 0 8px"></p>
         <div id="gmail-list"></div>
+        <button class="primary load-more hidden" id="gmail-more">Load 50 more emails</button>
         <button class="linkbtn" id="gmail-reset">Use a different Google account or client ID</button>
       </div>
       <div id="drive-browse" class="hidden">
@@ -303,7 +321,10 @@
           <input class="field" id="drive-q" style="margin:0" placeholder="Search your Drive by name">
           <button class="ctl" id="drive-search" title="Search" style="flex:none">🔍</button>
         </div>
+        <p class="note" id="drive-status" style="margin:0 0 8px"></p>
         <div id="drive-list"></div>
+        <button class="primary load-more hidden" id="drive-more">Load 50 more files</button>
+        <p class="note" style="margin-top:10px">Imports Google Docs, Word documents, PDFs, EPUBs, TXT, Markdown and HTML.</p>
       </div>
     </div>
   </div>
@@ -335,6 +356,12 @@ function save() {
     try { localStorage.setItem(LS_KEY, JSON.stringify(store)); }
     catch (e) { alert("Couldn't save — storage is full. Delete a document and try again."); }
   }, 150);
+}
+/* v2 changes the old forced Substack search into an all-mail browser. */
+if (!store.gmailBrowseV2) {
+  if (store.gmailQuery === "from:substack.com") store.gmailQuery = "";
+  store.gmailBrowseV2 = true;
+  save();
 }
 
 /* seed a welcome doc on first launch */
@@ -647,17 +674,23 @@ async function gmailImportMessage(id) {
   if (!text) throw new Error("no readable text in that email");
   return addDoc(headers["subject"] || "Email", text);
 }
-async function gmailSearch(q) {
-  const list = await gapi("messages", { q, maxResults: "25" });
-  if (!list.messages || !list.messages.length) return [];
+async function gmailSearch(q, pageToken) {
+  const params = { maxResults: "50" };
+  if (q) params.q = q;
+  if (pageToken) params.pageToken = pageToken;
+  const list = await gapi("messages", params);
+  if (!list.messages || !list.messages.length) {
+    return { mails: [], nextPageToken: "", resultSizeEstimate: list.resultSizeEstimate || 0 };
+  }
   const metas = await Promise.all(list.messages.map(m => gapi("messages/" + m.id, new URLSearchParams([
     ["format", "metadata"], ["metadataHeaders", "Subject"], ["metadataHeaders", "From"], ["metadataHeaders", "Date"]
   ]))));
-  return metas.map(m => {
+  const mails = metas.map(m => {
     const h = {};
     for (const x of (m.payload && m.payload.headers) || []) h[x.name.toLowerCase()] = x.value;
     return { id: m.id, subject: h["subject"] || "(no subject)", from: (h["from"] || "").replace(/\s*<.*>/, ""), date: (h["date"] || "").split(/ \d\d:/)[0] };
   });
+  return { mails, nextPageToken: list.nextPageToken || "", resultSizeEstimate: list.resultSizeEstimate || mails.length };
 }
 
 /* ----- Google Drive ----- */
@@ -667,24 +700,34 @@ async function gfetchRaw(url) {
   if (!r.ok) throw new Error("Google Drive returned " + r.status);
   return r;
 }
-async function driveList(nameQuery) {
-  const types = ["application/vnd.google-apps.document", "text/plain", "text/markdown", "text/html", "application/pdf", "application/epub+zip"];
+async function driveList(nameQuery, pageToken) {
+  const types = [
+    "application/vnd.google-apps.document",
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    "text/plain", "text/markdown", "text/html", "application/pdf", "application/epub+zip"
+  ];
   let q = "trashed=false and (" + types.map(t => "mimeType='" + t + "'").join(" or ") + ")";
   if (nameQuery) q += " and name contains '" + nameQuery.replace(/['\\]/g, "") + "'";
-  const res = await (await gfetchRaw("https://www.googleapis.com/drive/v3/files?" + new URLSearchParams({
-    q, orderBy: "modifiedTime desc", pageSize: "25", fields: "files(id,name,mimeType,modifiedTime)"
-  }))).json();
-  return res.files || [];
+  const params = {
+    q, orderBy: "modifiedTime desc", pageSize: "50",
+    fields: "nextPageToken,files(id,name,mimeType,modifiedTime)"
+  };
+  if (pageToken) params.pageToken = pageToken;
+  const res = await (await gfetchRaw("https://www.googleapis.com/drive/v3/files?" + new URLSearchParams(params))).json();
+  return { files: res.files || [], nextPageToken: res.nextPageToken || "" };
 }
 async function driveImport(f) {
   const base = "https://www.googleapis.com/drive/v3/files/" + f.id;
   let d;
   if (f.mimeType === "application/vnd.google-apps.document") {
     d = { title: f.name, text: await (await gfetchRaw(base + "/export?mimeType=text/plain")).text() };
-  } else if (f.mimeType === "application/pdf" || f.mimeType === "application/epub+zip") {
+  } else if (f.mimeType === "application/pdf" || f.mimeType === "application/epub+zip" ||
+             f.mimeType === "application/vnd.openxmlformats-officedocument.wordprocessingml.document") {
     const buf = await (await gfetchRaw(base + "?alt=media")).arrayBuffer();
     const file = new File([buf], f.name, { type: f.mimeType });
-    d = f.mimeType === "application/pdf" ? { title: f.name.replace(/\.pdf$/i, ""), text: await pdfToText(file) } : await epubToDoc(file);
+    if (f.mimeType === "application/pdf") d = { title: f.name.replace(/\.pdf$/i, ""), text: await pdfToText(file) };
+    else if (f.mimeType === "application/epub+zip") d = await epubToDoc(file);
+    else d = { title: f.name.replace(/\.docx$/i, ""), text: await docxToText(file) };
   } else if (f.mimeType === "text/html") {
     const dom = new DOMParser().parseFromString(await (await gfetchRaw(base + "?alt=media")).text(), "text/html");
     d = { title: dom.title || f.name, text: htmlToText(dom.body || dom.documentElement) };
@@ -695,17 +738,35 @@ async function driveImport(f) {
   if (!d.text) throw new Error("no readable text in that file");
   return addDoc(d.title, d.text);
 }
-async function runDriveList() {
+let driveNextPageToken = "", driveActiveQuery = "", driveShown = 0;
+async function runDriveList(append = false) {
   const listEl = $("drive-list");
-  listEl.innerHTML = '<p class="note" style="margin:8px 0">Connecting to Google Drive…</p>';
+  const more = $("drive-more");
+  const status = $("drive-status");
+  if (!append) {
+    driveActiveQuery = $("drive-q").value.trim();
+    driveNextPageToken = "";
+    driveShown = 0;
+    listEl.innerHTML = '<p class="note" style="margin:8px 0">Connecting to Google Drive…</p>';
+  }
+  more.classList.add("hidden");
   try {
     await gmailAuth();
-    listEl.innerHTML = '<p class="note" style="margin:8px 0">Loading your files…</p>';
-    const files = await driveList($("drive-q").value.trim());
-    listEl.innerHTML = "";
-    if (!files.length) { listEl.innerHTML = '<p class="note" style="margin:8px 0">No readable files found (Docs, PDF, EPUB, text).</p>'; return; }
-    const KIND = { "application/vnd.google-apps.document": "Google Doc", "application/pdf": "PDF", "application/epub+zip": "EPUB", "text/plain": "text", "text/markdown": "markdown", "text/html": "web page" };
-    for (const f of files) {
+    if (!append) listEl.innerHTML = '<p class="note" style="margin:8px 0">Loading your files…</p>';
+    const page = await driveList(driveActiveQuery, append ? driveNextPageToken : "");
+    if (!append) listEl.innerHTML = "";
+    if (!page.files.length && !append) {
+      listEl.innerHTML = '<p class="note" style="margin:8px 0">No readable files found.</p>';
+      status.textContent = "";
+      return;
+    }
+    const KIND = {
+      "application/vnd.google-apps.document": "Google Doc",
+      "application/vnd.openxmlformats-officedocument.wordprocessingml.document": "Word",
+      "application/pdf": "PDF", "application/epub+zip": "EPUB", "text/plain": "text",
+      "text/markdown": "markdown", "text/html": "web page"
+    };
+    for (const f of page.files) {
       const b = document.createElement("button");
       b.className = "mail";
       const t = document.createElement("b"); t.textContent = f.name;
@@ -718,16 +779,21 @@ async function runDriveList() {
       };
       listEl.appendChild(b);
     }
+    driveShown += page.files.length;
+    driveNextPageToken = page.nextPageToken;
+    status.textContent = "Showing " + driveShown + " files" + (driveActiveQuery ? " matching “" + driveActiveQuery + "”" : "");
+    more.classList.toggle("hidden", !driveNextPageToken);
   } catch (err) {
-    listEl.innerHTML = "";
+    if (!append) listEl.innerHTML = "";
     const p = document.createElement("p"); p.className = "note"; p.style.margin = "8px 0";
     p.textContent = "⚠︎ " + err.message;
     listEl.appendChild(p);
   }
 }
 $("row-drive").onclick = () => showGmailSheet("drive");
-$("drive-search").onclick = runDriveList;
-$("drive-q").onkeydown = (e) => { if (e.key === "Enter") runDriveList(); };
+$("drive-search").onclick = () => runDriveList(false);
+$("drive-more").onclick = () => runDriveList(true);
+$("drive-q").onkeydown = (e) => { if (e.key === "Enter") runDriveList(false); };
 
 /* Google sheet UI (shared by Gmail + Drive) */
 let googleTarget = "gmail";
@@ -740,23 +806,43 @@ function showGmailSheet(target) {
   $("gmail-browse").classList.toggle("hidden", !hasId || googleTarget !== "gmail");
   $("drive-browse").classList.toggle("hidden", !hasId || googleTarget !== "drive");
   if (hasId && googleTarget === "gmail") {
-    $("gmail-q").value = store.gmailQuery || "from:substack.com";
-    runGmailSearch();
+    $("gmail-q").value = store.gmailQuery || "";
+    syncGmailFilter();
+    runGmailSearch(false);
   }
   if (hasId && googleTarget === "drive") runDriveList();
 }
-async function runGmailSearch() {
+let gmailNextPageToken = "", gmailActiveQuery = "", gmailShown = 0;
+function syncGmailFilter() {
+  const q = $("gmail-q").value.trim();
+  for (const chip of document.querySelectorAll("#gmail-filters .filter-chip")) {
+    chip.classList.toggle("active", chip.dataset.q === q);
+  }
+}
+async function runGmailSearch(append = false) {
   const listEl = $("gmail-list");
-  const q = $("gmail-q").value.trim() || "from:substack.com";
-  store.gmailQuery = q; save();
-  listEl.innerHTML = '<p class="note" style="margin:8px 0">Connecting to Gmail…</p>';
+  const more = $("gmail-more");
+  const status = $("gmail-status");
+  if (!append) {
+    gmailActiveQuery = $("gmail-q").value.trim();
+    gmailNextPageToken = "";
+    gmailShown = 0;
+    store.gmailQuery = gmailActiveQuery; save();
+    syncGmailFilter();
+    listEl.innerHTML = '<p class="note" style="margin:8px 0">Connecting to Gmail…</p>';
+  }
+  more.classList.add("hidden");
   try {
     await gmailAuth();
-    listEl.innerHTML = '<p class="note" style="margin:8px 0">Searching…</p>';
-    const mails = await gmailSearch(q);
-    listEl.innerHTML = "";
-    if (!mails.length) { listEl.innerHTML = '<p class="note" style="margin:8px 0">No emails matched that search.</p>'; return; }
-    for (const m of mails) {
+    if (!append) listEl.innerHTML = '<p class="note" style="margin:8px 0">Searching your mailbox…</p>';
+    const page = await gmailSearch(gmailActiveQuery, append ? gmailNextPageToken : "");
+    if (!append) listEl.innerHTML = "";
+    if (!page.mails.length && !append) {
+      listEl.innerHTML = '<p class="note" style="margin:8px 0">No emails matched that search.</p>';
+      status.textContent = "";
+      return;
+    }
+    for (const m of page.mails) {
       const b = document.createElement("button");
       b.className = "mail";
       const title = document.createElement("b"); title.textContent = m.subject;
@@ -774,8 +860,12 @@ async function runGmailSearch() {
       };
       listEl.appendChild(b);
     }
+    gmailShown += page.mails.length;
+    gmailNextPageToken = page.nextPageToken;
+    status.textContent = "Showing " + gmailShown + (page.resultSizeEstimate > gmailShown ? " of about " + page.resultSizeEstimate : "") + " emails";
+    more.classList.toggle("hidden", !gmailNextPageToken);
   } catch (err) {
-    listEl.innerHTML = "";
+    if (!append) listEl.innerHTML = "";
     const p = document.createElement("p"); p.className = "note"; p.style.margin = "8px 0";
     p.textContent = "⚠︎ " + err.message;
     listEl.appendChild(p);
@@ -788,8 +878,17 @@ $("gmail-connect").onclick = () => {
   store.gmailClientId = id; save();
   showGmailSheet(googleTarget);
 };
-$("gmail-search").onclick = runGmailSearch;
-$("gmail-q").onkeydown = (e) => { if (e.key === "Enter") runGmailSearch(); };
+$("gmail-search").onclick = () => runGmailSearch(false);
+$("gmail-more").onclick = () => runGmailSearch(true);
+$("gmail-q").oninput = syncGmailFilter;
+$("gmail-q").onkeydown = (e) => { if (e.key === "Enter") runGmailSearch(false); };
+for (const chip of document.querySelectorAll("#gmail-filters .filter-chip")) {
+  chip.onclick = () => {
+    $("gmail-q").value = chip.dataset.q;
+    syncGmailFilter();
+    runGmailSearch(false);
+  };
+}
 $("gmail-reset").onclick = () => {
   if (!confirm("Forget the saved client ID and sign out?")) return;
   store.gmailClientId = ""; gmailToken = null; save();
@@ -982,6 +1081,15 @@ function joinPath(dir, href) {
   }
   return out.join("/");
 }
+async function docxToText(file) {
+  const zip = await unzip(await file.arrayBuffer());
+  const raw = await zip.read("word/document.xml");
+  if (!raw) throw new Error("couldn't read this Word document");
+  const xml = new DOMParser().parseFromString(raw, "application/xml");
+  const paras = Array.from(xml.getElementsByTagNameNS("*", "p"));
+  return paras.map(p => p.textContent.trim()).filter(Boolean).join("\n\n");
+}
+
 async function epubToDoc(file) {
   const zip = await unzip(await file.arrayBuffer());
   const container = await zip.read("META-INF/container.xml");
@@ -1222,4 +1330,4 @@ if ("serviceWorker" in navigator && location.protocol === "https:") {
 </body>
 </html>
 
-<!-- v1.1.2 — deployed via GitHub Pages -->
+<!-- v1.2.0 — Gmail mailbox browser + expanded Drive imports -->
