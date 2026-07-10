@@ -49,8 +49,10 @@ Host the folder anywhere static (GitHub Pages, Vercel, Netlify, …), open the U
 in Safari, then **Share → Add to Home Screen**. It launches full-screen like a
 native app and works offline after the first visit.
 
-For GitHub Pages: enable Pages for this repo (Settings → Pages → deploy from
-branch), and the app will be served at `https://<user>.github.io/<repo>/readrrr/`.
+GitHub Pages deployment is automated: `.github/workflows/deploy-pages.yml`
+publishes this folder as the Pages site on every push (the repo must be
+public, or on a paid plan, for Pages to activate). The app is served at
+`https://<user>.github.io/<repo>/`.
 
 ## Gmail setup
 
