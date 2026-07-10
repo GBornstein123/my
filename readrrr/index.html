@@ -323,6 +323,11 @@ function load() {
     stats: { words: 0, ms: 0, sessions: 0, bestWpm: 0, finished: 0, streak: 0, lastDay: "" }
   };
 }
+/* OAuth client IDs for browser apps are public by design — security comes from the
+   authorized-origin restriction on Google's side, not from hiding this string. */
+const DEFAULT_GMAIL_CLIENT_ID = "555482627148-l8orrdd69os1l01obve0p5tj6oqfc4h0.apps.googleusercontent.com";
+if (!store.gmailClientId) store.gmailClientId = DEFAULT_GMAIL_CLIENT_ID;
+
 let saveT = null;
 function save() {
   clearTimeout(saveT);
