@@ -19,7 +19,23 @@ your brain skips the mechanics of reading and just absorbs meaning.
   and footers
 - **Direct Gmail import** — connect your Gmail (read-only, entirely in-browser;
   no server ever sees your mail) and pull newsletters into the library with one
-  tap. See [Gmail setup](#gmail-setup) below
+  tap. See [Google setup](#gmail-setup) below
+- **Google Drive import** — same one-time Google connection; lists your Docs,
+  PDFs, EPUBs, and text files, one tap imports (Docs are exported as plain text)
+- **From a link** — paste any public article URL (fetched and cleaned via the
+  r.jina.ai reader), or a Substack publication / RSS feed URL to browse and
+  import recent posts
+- **Share to the app** — opening the app with `#url=<encoded url>` or
+  `#text=<encoded text>` imports immediately; the PWA manifest also registers
+  it as an Android share target. On iOS, make a two-step Shortcut (Share Sheet
+  → *Open URL* `https://<your-origin>/#url=[URL-encoded shortcut input]`); on
+  desktop, use a bookmarklet:
+
+  ```
+  javascript:(function(){var s=getSelection().toString();location.href='https://<your-origin>/#'+(s?'text='+encodeURIComponent(s):'url='+encodeURIComponent(location.href))})()
+  ```
+- **Clipboard one-tap** — "Paste from clipboard & start" reads the clipboard
+  and begins the stream
 - **EPUB books** — full spine-ordered chapter extraction with a dependency-free
   zip reader (browser-native `DecompressionStream`). Kindle purchases
   (`.azw`/`.kfx`) are DRM-locked by Amazon and cannot be imported; use DRM-free
@@ -56,14 +72,16 @@ public, or on a paid plan, for Pages to activate). The app is served at
 
 ## Gmail setup
 
-The "Import from Gmail" button talks to the Gmail API straight from your
-browser with a read-only scope — there is no backend, and the access token
-never leaves the page. Google requires the app to present its own OAuth
-credential, so a one-time setup (~10 minutes, free) is needed:
+The "Import from Gmail" and "Import from Google Drive" buttons talk to
+Google's APIs straight from your browser with read-only scopes — there is no
+backend, and the access token never leaves the page. Google requires the app
+to present its own OAuth credential, so a one-time setup (~10 minutes, free)
+is needed:
 
 1. Go to [console.cloud.google.com](https://console.cloud.google.com) and
    create a project (any name)
-2. **APIs & Services → Library** → search "Gmail API" → **Enable**
+2. **APIs & Services → Library** → enable both the **Gmail API** and the
+   **Google Drive API**
 3. **APIs & Services → OAuth consent screen** → External → fill in the app
    name and your email → under **Test users**, add your own Gmail address
    (the app can stay in "Testing" mode forever for personal use)

@@ -258,20 +258,31 @@
     <div id="sheet-main">
       <button class="sheet-row" id="row-paste"><span class="ic">✍️</span><span>Paste text<small>Articles, notes, emails — anything</small></span></button>
       <button class="sheet-row" id="row-file"><span class="ic">📄</span><span>Import a file<small>PDF, EPUB, email (.eml), .html, .txt, .md</small></span></button>
+      <button class="sheet-row" id="row-link"><span class="ic">🔗</span><span>From a link<small>Article URL, Substack publication, or RSS feed</small></span></button>
       <button class="sheet-row" id="row-gmail"><span class="ic">📬</span><span>Import from Gmail<small>Pull Substack &amp; newsletters straight from your inbox</small></span></button>
+      <button class="sheet-row" id="row-drive"><span class="ic">📂</span><span>Import from Google Drive<small>Docs, PDFs, EPUBs and text files</small></span></button>
       <input type="file" id="file-input" accept=".txt,.md,.pdf,.eml,.epub,.html,.htm,text/plain,application/pdf,message/rfc822,application/epub+zip,text/html" class="hidden">
       <p class="note" style="margin-top:6px"><b>Substack &amp; paid newsletters:</b> connect Gmail above, or save the email (Gmail desktop: ⋮ → “Download message”) and import the .eml. The reader strips the buttons and footer and keeps the article.<br><br><b>Books:</b> DRM‑free EPUBs import fully, chapter by chapter. Kindle purchases (.azw/.kfx) are locked by Amazon’s DRM and can’t be opened outside Kindle apps.</p>
     </div>
     <div id="sheet-paste" class="hidden">
       <textarea id="paste-area" placeholder="Paste your text here…"></textarea>
       <button class="primary" id="paste-save">Start reading</button>
+      <button class="linkbtn" id="paste-clip">Paste from clipboard &amp; start</button>
+    </div>
+    <div id="sheet-link" class="hidden">
+      <div style="display:flex; gap:8px; margin-bottom:10px">
+        <input class="field" id="link-input" style="margin:0" placeholder="https://… article, publication, or feed" inputmode="url" autocapitalize="off">
+        <button class="ctl" id="link-go" title="Fetch" style="flex:none">→</button>
+      </div>
+      <div id="link-list"></div>
+      <p class="note" style="margin-top:8px">Works for public pages — Substack publications list their recent posts. Paid/paywalled posts come in through Gmail or .eml import instead.</p>
     </div>
     <div id="sheet-gmail" class="hidden">
       <div id="gmail-setup" class="hidden">
         <p class="note" style="margin:0 0 12px">
           <b>One-time setup</b> — the app talks to Gmail directly from your browser (read-only; nothing leaves your device), but Google requires it to have its own credential:<br><br>
           1. Go to <b>console.cloud.google.com</b> → create a project<br>
-          2. <b>APIs &amp; Services → Library</b> → enable the <b>Gmail API</b><br>
+          2. <b>APIs &amp; Services → Library</b> → enable the <b>Gmail API</b> and the <b>Google Drive API</b><br>
           3. <b>OAuth consent screen</b> → External → add your own Gmail address as a <b>test user</b><br>
           4. <b>Credentials → Create credentials → OAuth client ID → Web application</b> → under <b>Authorized JavaScript origins</b> add the URL you open this app from (e.g. your GitHub Pages origin)<br>
           5. Paste the client ID below
@@ -286,6 +297,13 @@
         </div>
         <div id="gmail-list"></div>
         <button class="linkbtn" id="gmail-reset">Use a different Google account or client ID</button>
+      </div>
+      <div id="drive-browse" class="hidden">
+        <div style="display:flex; gap:8px; margin-bottom:10px">
+          <input class="field" id="drive-q" style="margin:0" placeholder="Search your Drive by name">
+          <button class="ctl" id="drive-search" title="Search" style="flex:none">🔍</button>
+        </div>
+        <div id="drive-list"></div>
       </div>
     </div>
   </div>
@@ -402,6 +420,7 @@ function openSheet() {
   $("sheet-main").classList.remove("hidden");
   $("sheet-paste").classList.add("hidden");
   $("sheet-gmail").classList.add("hidden");
+  $("sheet-link").classList.add("hidden");
 }
 function closeSheet() { backdrop.classList.remove("open"); $("paste-area").value = ""; }
 $("add-btn").onclick = openSheet;
@@ -563,8 +582,8 @@ async function emlToDoc(file) {
   return { title, text };
 }
 
-/* ---------- Gmail integration (in-browser OAuth, read-only) ---------- */
-const GMAIL_SCOPE = "https://www.googleapis.com/auth/gmail.readonly";
+/* ---------- Google integration: Gmail + Drive (in-browser OAuth, read-only) ---------- */
+const GMAIL_SCOPE = "https://www.googleapis.com/auth/gmail.readonly https://www.googleapis.com/auth/drive.readonly";
 let gmailToken = null; // access token, kept in memory only
 
 function loadGsi() {
@@ -636,17 +655,90 @@ async function gmailSearch(q) {
   });
 }
 
-/* Gmail sheet UI */
-function showGmailSheet() {
+/* ----- Google Drive ----- */
+async function gfetchRaw(url) {
+  const r = await fetch(url, { headers: { Authorization: "Bearer " + gmailToken } });
+  if (r.status === 401 || r.status === 403) { gmailToken = null; throw new Error("Google session expired — try again"); }
+  if (!r.ok) throw new Error("Google Drive returned " + r.status);
+  return r;
+}
+async function driveList(nameQuery) {
+  const types = ["application/vnd.google-apps.document", "text/plain", "text/markdown", "text/html", "application/pdf", "application/epub+zip"];
+  let q = "trashed=false and (" + types.map(t => "mimeType='" + t + "'").join(" or ") + ")";
+  if (nameQuery) q += " and name contains '" + nameQuery.replace(/['\\]/g, "") + "'";
+  const res = await (await gfetchRaw("https://www.googleapis.com/drive/v3/files?" + new URLSearchParams({
+    q, orderBy: "modifiedTime desc", pageSize: "25", fields: "files(id,name,mimeType,modifiedTime)"
+  }))).json();
+  return res.files || [];
+}
+async function driveImport(f) {
+  const base = "https://www.googleapis.com/drive/v3/files/" + f.id;
+  let d;
+  if (f.mimeType === "application/vnd.google-apps.document") {
+    d = { title: f.name, text: await (await gfetchRaw(base + "/export?mimeType=text/plain")).text() };
+  } else if (f.mimeType === "application/pdf" || f.mimeType === "application/epub+zip") {
+    const buf = await (await gfetchRaw(base + "?alt=media")).arrayBuffer();
+    const file = new File([buf], f.name, { type: f.mimeType });
+    d = f.mimeType === "application/pdf" ? { title: f.name.replace(/\.pdf$/i, ""), text: await pdfToText(file) } : await epubToDoc(file);
+  } else if (f.mimeType === "text/html") {
+    const dom = new DOMParser().parseFromString(await (await gfetchRaw(base + "?alt=media")).text(), "text/html");
+    d = { title: dom.title || f.name, text: htmlToText(dom.body || dom.documentElement) };
+  } else {
+    d = { title: f.name.replace(/\.(txt|md)$/i, ""), text: await (await gfetchRaw(base + "?alt=media")).text() };
+  }
+  d.text = cleanText(d.text || "");
+  if (!d.text) throw new Error("no readable text in that file");
+  return addDoc(d.title, d.text);
+}
+async function runDriveList() {
+  const listEl = $("drive-list");
+  listEl.innerHTML = '<p class="note" style="margin:8px 0">Connecting to Google Drive…</p>';
+  try {
+    await gmailAuth();
+    listEl.innerHTML = '<p class="note" style="margin:8px 0">Loading your files…</p>';
+    const files = await driveList($("drive-q").value.trim());
+    listEl.innerHTML = "";
+    if (!files.length) { listEl.innerHTML = '<p class="note" style="margin:8px 0">No readable files found (Docs, PDF, EPUB, text).</p>'; return; }
+    const KIND = { "application/vnd.google-apps.document": "Google Doc", "application/pdf": "PDF", "application/epub+zip": "EPUB", "text/plain": "text", "text/markdown": "markdown", "text/html": "web page" };
+    for (const f of files) {
+      const b = document.createElement("button");
+      b.className = "mail";
+      const t = document.createElement("b"); t.textContent = f.name;
+      const meta = document.createElement("small"); meta.textContent = (KIND[f.mimeType] || f.mimeType) + " · " + (f.modifiedTime || "").slice(0, 10);
+      b.append(t, meta);
+      b.onclick = async () => {
+        t.textContent = "Importing…";
+        try { const doc = await driveImport(f); closeSheet(); openReader(doc); }
+        catch (err) { t.textContent = f.name; alert("Import failed: " + err.message); }
+      };
+      listEl.appendChild(b);
+    }
+  } catch (err) {
+    listEl.innerHTML = "";
+    const p = document.createElement("p"); p.className = "note"; p.style.margin = "8px 0";
+    p.textContent = "⚠︎ " + err.message;
+    listEl.appendChild(p);
+  }
+}
+$("row-drive").onclick = () => showGmailSheet("drive");
+$("drive-search").onclick = runDriveList;
+$("drive-q").onkeydown = (e) => { if (e.key === "Enter") runDriveList(); };
+
+/* Google sheet UI (shared by Gmail + Drive) */
+let googleTarget = "gmail";
+function showGmailSheet(target) {
+  googleTarget = target === "drive" ? "drive" : "gmail";
   $("sheet-main").classList.add("hidden");
   $("sheet-gmail").classList.remove("hidden");
   const hasId = !!store.gmailClientId;
   $("gmail-setup").classList.toggle("hidden", hasId);
-  $("gmail-browse").classList.toggle("hidden", !hasId);
-  if (hasId) {
+  $("gmail-browse").classList.toggle("hidden", !hasId || googleTarget !== "gmail");
+  $("drive-browse").classList.toggle("hidden", !hasId || googleTarget !== "drive");
+  if (hasId && googleTarget === "gmail") {
     $("gmail-q").value = store.gmailQuery || "from:substack.com";
     runGmailSearch();
   }
+  if (hasId && googleTarget === "drive") runDriveList();
 }
 async function runGmailSearch() {
   const listEl = $("gmail-list");
@@ -684,20 +776,161 @@ async function runGmailSearch() {
     listEl.appendChild(p);
   }
 }
-$("row-gmail").onclick = showGmailSheet;
+$("row-gmail").onclick = () => showGmailSheet("gmail");
 $("gmail-connect").onclick = () => {
   const id = $("gmail-client-id").value.trim();
   if (!/\.apps\.googleusercontent\.com$/.test(id)) { alert("That doesn't look like a Google OAuth client ID — it should end in .apps.googleusercontent.com"); return; }
   store.gmailClientId = id; save();
-  showGmailSheet();
+  showGmailSheet(googleTarget);
 };
 $("gmail-search").onclick = runGmailSearch;
 $("gmail-q").onkeydown = (e) => { if (e.key === "Enter") runGmailSearch(); };
 $("gmail-reset").onclick = () => {
   if (!confirm("Forget the saved client ID and sign out?")) return;
   store.gmailClientId = ""; gmailToken = null; save();
-  showGmailSheet();
+  showGmailSheet(googleTarget);
 };
+
+/* ---------- link / RSS / Substack-publication import ---------- */
+const READER_PROXY = "https://r.jina.ai/";       // returns readable markdown for a page
+const XML_PROXY = "https://api.allorigins.win/raw?url="; // CORS pass-through for feed XML
+function mdToText(md) {
+  return cleanText(md
+    .replace(/!\[[^\]]*\]\([^)]*\)/g, "")     // images
+    .replace(/\[([^\]]*)\]\([^)]*\)/g, "$1")  // links → their text
+    .replace(/^#{1,6}\s*/gm, "")
+    .replace(/^[-*_]{3,}\s*$/gm, "")
+    .replace(/[*_]{1,3}([^*_\n]+)[*_]{1,3}/g, "$1")
+    .replace(/^>\s?/gm, "")
+    .replace(/`{1,3}/g, ""));
+}
+async function fetchArticle(url) {
+  let r;
+  try { r = await fetch(READER_PROXY + url); }
+  catch (e) { throw new Error("couldn't reach the page-reader service. Check your connection — and note this only works in the hosted app, not the claude.ai preview."); }
+  if (!r.ok) throw new Error("couldn't fetch that page (" + r.status + ")" + (r.status === 451 || r.status === 403 ? " — it may be paywalled; use Gmail/.eml import for paid posts" : ""));
+  const raw = await r.text();
+  let title = "", body = raw;
+  const tm = raw.match(/^Title:\s*(.+)$/m);
+  if (tm) title = tm[1].trim();
+  const cm = raw.indexOf("Markdown Content:");
+  if (cm >= 0) body = raw.slice(cm + "Markdown Content:".length);
+  const text = mdToText(body);
+  if (!text || text.split(/\s+/).length < 20) throw new Error("that page didn't yield readable text — it may be paywalled or script-rendered");
+  return { title: title || url.replace(/^https?:\/\//, "").slice(0, 80), text };
+}
+async function fetchFeed(url) {
+  let r;
+  try { r = await fetch(XML_PROXY + encodeURIComponent(url)); }
+  catch (e) { throw new Error("couldn't reach the feed. Check your connection — and note this only works in the hosted app, not the claude.ai preview."); }
+  if (!r.ok) throw new Error("couldn't fetch that feed (" + r.status + ")");
+  const xml = new DOMParser().parseFromString(await r.text(), "application/xml");
+  if (xml.querySelector("parsererror")) throw new Error("that URL isn't an RSS/Atom feed");
+  const items = [];
+  for (const it of xml.querySelectorAll("item, entry")) {
+    const get = (tag) => { const el = it.getElementsByTagName(tag)[0]; return el ? el.textContent : ""; };
+    const linkEl = it.getElementsByTagName("link")[0];
+    items.push({
+      title: get("title").trim() || "(untitled)",
+      link: (linkEl && (linkEl.getAttribute("href") || linkEl.textContent) || "").trim(),
+      date: (get("pubDate") || get("published") || get("updated")).slice(0, 16),
+      html: get("encoded") || ""   // <content:encoded> full post body, when the feed carries it
+    });
+    if (items.length >= 25) break;
+  }
+  if (!items.length) throw new Error("no posts found in that feed");
+  return items;
+}
+function renderFeedList(items) {
+  const listEl = $("link-list");
+  listEl.innerHTML = "";
+  for (const it of items) {
+    const b = document.createElement("button");
+    b.className = "mail";
+    const t = document.createElement("b"); t.textContent = it.title;
+    const meta = document.createElement("small"); meta.textContent = it.date || it.link;
+    b.append(t, meta);
+    b.onclick = async () => {
+      t.textContent = "Importing…";
+      try {
+        let doc;
+        if (it.html && htmlToText(new DOMParser().parseFromString(it.html, "text/html").body).split(/\s+/).length > 60) {
+          doc = addDoc(it.title, htmlToText(new DOMParser().parseFromString(it.html, "text/html").body));
+        } else {
+          const a = await fetchArticle(it.link);
+          doc = addDoc(it.title || a.title, a.text);
+        }
+        closeSheet(); openReader(doc);
+      } catch (err) { t.textContent = it.title; alert("Import failed: " + err.message); }
+    };
+    listEl.appendChild(b);
+  }
+}
+async function importFromLink(input) {
+  let url = input.trim();
+  if (!url) return;
+  if (!/^https?:\/\//i.test(url)) url = "https://" + url;
+  const listEl = $("link-list");
+  listEl.innerHTML = '<p class="note" style="margin:8px 0">Fetching…</p>';
+  try {
+    const u = new URL(url);
+    const isFeed = /\/feed\/?$|\.(xml|rss|atom)(\?|$)/i.test(u.pathname);
+    const isSiteRoot = u.pathname === "/" || u.pathname === "";
+    if (isFeed) { renderFeedList(await fetchFeed(url)); return; }
+    if (isSiteRoot) {  // a publication home page — try its feed first, fall back to the page itself
+      try { renderFeedList(await fetchFeed(u.origin + "/feed")); return; } catch (e) {}
+    }
+    const a = await fetchArticle(url);
+    listEl.innerHTML = "";
+    const doc = addDoc(a.title, a.text);
+    closeSheet(); openReader(doc);
+  } catch (err) {
+    listEl.innerHTML = "";
+    const p = document.createElement("p"); p.className = "note"; p.style.margin = "8px 0";
+    p.textContent = "⚠︎ " + err.message;
+    listEl.appendChild(p);
+  }
+}
+$("row-link").onclick = () => {
+  $("sheet-main").classList.add("hidden");
+  $("sheet-link").classList.remove("hidden");
+  $("link-input").focus();
+};
+$("link-go").onclick = () => importFromLink($("link-input").value);
+$("link-input").onkeydown = (e) => { if (e.key === "Enter") importFromLink($("link-input").value); };
+
+/* clipboard one-tap */
+$("paste-clip").onclick = async () => {
+  try {
+    const text = (await navigator.clipboard.readText()).trim();
+    if (!text) { alert("Clipboard is empty."); return; }
+    const doc = addDoc(text.split("\n")[0].split(/\s+/).slice(0, 8).join(" ") || "Clipboard", text);
+    closeSheet(); openReader(doc);
+  } catch (e) { alert("Couldn't read the clipboard — paste into the box instead."); }
+};
+
+/* share-target / bookmarklet / iOS-Shortcut intake:
+   open the app with #text=…, #url=…, ?text=…, or ?url=… and it imports immediately */
+async function handleIntake() {
+  const qp = new URLSearchParams(location.search);
+  const hm = location.hash.match(/^#(text|url)=([\s\S]+)/);
+  const kind = hm ? hm[1] : (qp.get("url") ? "url" : qp.get("text") ? "text" : null);
+  if (!kind) return;
+  const val = decodeURIComponent(hm ? hm[2] : qp.get(kind));
+  history.replaceState(null, "", location.pathname);
+  if (kind === "text") {
+    const doc = addDoc(val.split("\n")[0].split(/\s+/).slice(0, 8).join(" ") || "Shared text", val);
+    openReader(doc);
+  } else {
+    try {
+      const a = await fetchArticle(val);
+      const doc = addDoc(a.title, a.text);
+      openReader(doc);
+    } catch (err) { alert("Couldn't import the shared link: " + err.message); }
+  }
+}
+handleIntake();
+window.addEventListener("hashchange", handleIntake); // fires when the PWA is already open and receives a share
 
 /* ---------- EPUB import (pure JS: zip + spine, no libraries) ---------- */
 async function unzip(buf) {
