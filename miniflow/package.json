@@ -1,0 +1,41 @@
+{
+  "name": "miniflow",
+  "version": "0.1.0",
+  "description": "Minimal system-wide voice dictation for Windows: hold a hotkey, speak, release — polished text appears at your cursor.",
+  "author": "Greg",
+  "license": "MIT",
+  "type": "module",
+  "main": "src/main/main.js",
+  "scripts": {
+    "start": "electron .",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "dist": "electron-builder --win"
+  },
+  "dependencies": {
+    "node-global-key-listener": "^0.3.0"
+  },
+  "devDependencies": {
+    "electron": "^33.2.0",
+    "electron-builder": "^25.1.8",
+    "vitest": "^2.1.8"
+  },
+  "build": {
+    "appId": "dev.greg.miniflow",
+    "productName": "MiniFlow",
+    "files": [
+      "src/**/*",
+      "assets/**/*"
+    ],
+    "win": {
+      "target": [
+        "nsis",
+        "portable"
+      ]
+    },
+    "nsis": {
+      "oneClick": true,
+      "perMachine": false
+    }
+  }
+}

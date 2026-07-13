@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Welcome to MiniFlow</title>
+<style>
+  body {
+    font-family: "Segoe UI", system-ui, sans-serif;
+    margin: 0; padding: 28px;
+    background: #1e1e1e; color: #e8e8e8;
+    line-height: 1.5;
+  }
+  h1 { font-size: 20px; margin: 0 0 4px; }
+  h2 { font-size: 14px; margin: 20px 0 6px; color: #7ec8ff; }
+  p, li { font-size: 13px; color: #c8c8c8; margin: 4px 0; }
+  code, kbd {
+    background: #333; border-radius: 4px; padding: 1px 6px;
+    font-size: 12px; color: #ffd9a0;
+  }
+  .privacy { border-left: 3px solid #4a9; padding-left: 10px; margin-top: 18px; }
+</style>
+</head>
+<body>
+  <h1>MiniFlow</h1>
+  <p>Hold a key, speak, release — polished text appears wherever your cursor is.</p>
+
+  <h2>1 · The hotkey</h2>
+  <p>Hold <kbd>Right Ctrl</kbd> (changeable in the tray menu), speak, release.
+     Works in any app: Slack, Gmail, VS Code, anywhere you can type.</p>
+
+  <h2>2 · Microphone access</h2>
+  <p>Windows will ask for microphone permission on first use. If dictation
+     stays silent, check <i>Settings → Privacy &amp; security → Microphone</i>
+     and allow desktop apps.</p>
+
+  <h2>3 · API keys (cloud mode)</h2>
+  <p>Create a file named <code>.env</code> in the MiniFlow folder:</p>
+  <ul>
+    <li><code>GROQ_API_KEY=…</code> — transcription (or <code>OPENAI_API_KEY</code>)</li>
+    <li><code>ANTHROPIC_API_KEY=…</code> — optional, enables Claude cleanup;
+        without it a local rules cleaner is used</li>
+  </ul>
+
+  <h2>4 · Local mode (no cloud at all)</h2>
+  <p>Run <code>scripts/setup-local-mode.ps1</code> once to download
+     whisper.cpp, then flip the tray toggle to <i>Local</i>. Audio and text
+     never leave this PC — the cleanup pass automatically switches to the
+     offline rules engine.</p>
+
+  <div class="privacy">
+    <p><b>That's the whole list.</b> No accounts, no analytics, no sync.
+       Audio files are deleted right after transcription. Your last 10
+       dictations are kept in a local file for the tray history (your
+       recovery net if a paste ever fails) — nothing else is stored.</p>
+  </div>
+
+  <p style="margin-top:18px">Close this window to start. Reopen it any time
+     from the tray → <i>Setup guide</i>.</p>
+</body>
+</html>
