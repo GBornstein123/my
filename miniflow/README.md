@@ -33,6 +33,20 @@ release. First use triggers the Windows microphone permission prompt.
 
 Build a distributable installer + portable exe: `npm run dist` (on the PC).
 
+### Auto-start on login, no terminal window
+
+Once it's working, make it always-on and silent (tray dot only, no
+PowerShell window):
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\install-autostart.ps1
+```
+
+This adds a Startup shortcut that launches Electron hidden via
+`scripts\miniflow-hidden-launch.vbs`, and starts it immediately. Undo with
+`scripts\uninstall-autostart.ps1`. (You can also just double-click the
+`.vbs` any time to start MiniFlow silently.)
+
 ### Local mode (nothing leaves the machine)
 
 ```powershell
