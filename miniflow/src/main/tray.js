@@ -32,7 +32,7 @@ export const TRAY_ICONS = {
   error: () => nativeImage.createFromDataURL(ICON_PNGS.error),
 };
 
-export function buildTrayMenu({ state, settingsStore, history, onSettingsChanged, onShowOnboarding, onQuit }) {
+export function buildTrayMenu({ state, settingsStore, history, onSettingsChanged, onShowOnboarding, onOpenLog, onQuit }) {
   const settings = settingsStore.settings;
   const statusLabel = state.error
     ? `⚠ ${state.error}`
@@ -108,6 +108,7 @@ export function buildTrayMenu({ state, settingsStore, history, onSettingsChanged
     },
     { type: 'separator' },
     { label: 'Setup guide', click: onShowOnboarding },
+    { label: 'Open log file (for support)', click: onOpenLog },
     { label: 'Quit MiniFlow', click: onQuit },
   ]);
 }

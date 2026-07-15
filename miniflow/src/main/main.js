@@ -1,4 +1,4 @@
-import { app, Tray, BrowserWindow } from 'electron';
+import { app, Tray, BrowserWindow, shell } from 'electron';
 import { readFileSync, unlinkSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -10,8 +10,14 @@ import { createHotkeyListener } from './hotkey.js';
 import { TextInserter } from './inserter.js';
 import { RecorderWindow } from './recorderWindow.js';
 import { buildTrayMenu, TRAY_ICONS } from './tray.js';
+import { initLogger, log, logError, getLogPath } from './logger.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
+
+// Never let an uncaught error pop Electron's crash dialog or kill the tray.
+// Log it and keep running — a failed dictation must not take down the app.
+process.on('uncaughtException', (err) => logError('uncaughtException', err));
+process.on('unhandledRejection', (reason) => logError('unhandledRejection', reason));
 
 // API keys come from the environment or a .env file next to the app
 // (never from settings.json). Load .env before anything reads process.env.
@@ -47,16 +53,34 @@ class MiniFlow {
   }
 
   async start() {
-    await this.recorder.create();
-    this.inserter.warmUp();
+    // The tray is the one thing that must come up — it's how the user sees
+    // status and quits. Everything else is wrapped so a single failure
+    // degrades one feature instead of aborting startup.
     this.tray = new Tray(TRAY_ICONS.idle());
     this.tray.setToolTip('MiniFlow — voice dictation');
     this.refreshTray();
+    log('Tray created');
+
+    try {
+      await this.recorder.create();
+      log('Recorder window ready');
+    } catch (err) {
+      logError('recorder.create', err);
+      this.error = 'Mic recorder failed to start (see miniflow.log).';
+    }
+
+    try {
+      this.inserter.warmUp();
+    } catch (err) {
+      logError('inserter.warmUp', err);
+    }
+
     await this.restartHotkey();
 
     if (!this.settingsStore.settings.onboardingCompleted) {
-      this.showOnboarding();
+      try { this.showOnboarding(); } catch (err) { logError('showOnboarding', err); }
     }
+    log('Startup complete. Status:', this.error ?? 'ok');
   }
 
   async restartHotkey() {
@@ -68,8 +92,10 @@ class MiniFlow {
         onPress: () => this.hotkeyPressed(),
         onRelease: () => this.hotkeyReleased(),
       });
+      log('Hotkey listener started via', this.hotkey.constructor.name);
       this.error = null;
     } catch (err) {
+      logError('createHotkeyListener', err);
       this.error = `Hotkey listener failed: ${err.message}`;
     }
     this.refreshTray();
@@ -88,17 +114,21 @@ class MiniFlow {
     try {
       audioPath = await this.recorder.stop();
       if (!audioPath) {
+        log('Recording produced no audio (too short or silent)');
         this.setStatus('idle');
         return;
       }
       const pipeline = buildPipeline(this.settingsStore.settings, this.history);
       const result = await pipeline.process(audioPath);
       if (result) {
+        log('Transcribed:', result.text.slice(0, 80));
         const inserted = await this.inserter.insert(result.text);
         this.history.markInserted(result.historyId, inserted);
+        log('Inserted:', inserted);
       }
       this.error = null;
     } catch (err) {
+      logError('dictation', err);
       this.error = err.message;
     } finally {
       if (audioPath) {
@@ -130,6 +160,7 @@ class MiniFlow {
         this.refreshTray();
       },
       onShowOnboarding: () => this.showOnboarding(),
+      onOpenLog: () => { const p = getLogPath(); if (p) shell.showItemInFolder(p); },
       onQuit: () => app.quit(),
     }));
   }
@@ -168,9 +199,19 @@ if (!app.requestSingleInstanceLock()) {
   let miniflow = null;
 
   app.whenReady().then(async () => {
+    initLogger(app.getPath('userData'));
+    log('userData dir:', app.getPath('userData'));
+    log('log file:', getLogPath());
     loadDotEnv();
-    miniflow = new MiniFlow();
-    await miniflow.start();
+    log('Cloud keys present — GROQ:', !!process.env.GROQ_API_KEY,
+        'OPENAI:', !!process.env.OPENAI_API_KEY,
+        'ANTHROPIC:', !!process.env.ANTHROPIC_API_KEY);
+    try {
+      miniflow = new MiniFlow();
+      await miniflow.start();
+    } catch (err) {
+      logError('fatal startup', err);
+    }
   });
 
   // Tray app: keep running with no windows open.

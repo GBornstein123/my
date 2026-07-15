@@ -4,6 +4,7 @@ import { join, dirname } from 'node:path';
 import { tmpdir } from 'node:os';
 import { randomUUID } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
+import { log, logError } from './logger.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -27,7 +28,25 @@ export class RecorderWindow {
         nodeIntegration: false,
       },
     });
+
+    // Forward everything the hidden window says/breaks into the main log —
+    // otherwise renderer errors are invisible.
+    const wc = this.window.webContents;
+    wc.on('console-message', (_e, level, message, line, sourceId) => {
+      log('recorder-console:', message, `(${sourceId}:${line})`);
+    });
+    wc.on('render-process-gone', (_e, details) => {
+      logError('recorder render-process-gone', JSON.stringify(details));
+    });
+    wc.on('preload-error', (_e, preloadPath, err) => {
+      logError(`recorder preload-error ${preloadPath}`, err);
+    });
+    wc.on('did-fail-load', (_e, code, desc) => {
+      logError('recorder did-fail-load', `${code} ${desc}`);
+    });
+
     await this.window.loadFile(join(__dirname, '../renderer/recorder.html'));
+    log('Recorder window loaded');
 
     ipcMain.on('recorder:wav', async (_event, arrayBuffer, errorMessage) => {
       const pending = this.pendingStop;
