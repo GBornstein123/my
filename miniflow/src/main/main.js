@@ -6,7 +6,7 @@ import { fileURLToPath } from 'node:url';
 import { SettingsStore } from '../core/settings.js';
 import { HistoryStore } from '../core/historyStore.js';
 import { buildPipeline } from '../core/pipeline.js';
-import { HotkeyListener } from './hotkey.js';
+import { createHotkeyListener } from './hotkey.js';
 import { TextInserter } from './inserter.js';
 import { RecorderWindow } from './recorderWindow.js';
 import { buildTrayMenu, TRAY_ICONS } from './tray.js';
@@ -61,13 +61,13 @@ class MiniFlow {
 
   async restartHotkey() {
     this.hotkey?.stop();
-    this.hotkey = new HotkeyListener({
-      hotkey: this.settingsStore.settings.hotkey,
-      onPress: () => this.hotkeyPressed(),
-      onRelease: () => this.hotkeyReleased(),
-    });
+    this.hotkey = null;
     try {
-      await this.hotkey.start();
+      this.hotkey = await createHotkeyListener({
+        hotkey: this.settingsStore.settings.hotkey,
+        onPress: () => this.hotkeyPressed(),
+        onRelease: () => this.hotkeyReleased(),
+      });
       this.error = null;
     } catch (err) {
       this.error = `Hotkey listener failed: ${err.message}`;
