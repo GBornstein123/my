@@ -10,20 +10,26 @@ const STATUS_LABELS = {
   processing: () => 'Transcribing…',
 };
 
-// 16x16 tray icons drawn as data URLs so no binary assets need shipping.
-// Solid circle: gray = idle, red = recording, amber = processing/error.
-function circleIcon(color) {
-  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16">`
-    + `<circle cx="8" cy="8" r="6" fill="${color}"/></svg>`;
-  return nativeImage.createFromDataURL(
-    `data:image/svg+xml;base64,${Buffer.from(svg).toString('base64')}`);
-}
+// 16x16 tray icons embedded as PNG data URLs so no binary assets need
+// shipping. Solid circle: gray = idle, red = recording, amber = processing,
+// dull red = error. PNG, not SVG — nativeImage.createFromDataURL only
+// decodes PNG/JPEG, and an empty image makes `new Tray()` throw on Windows.
+const ICON_PNGS = {
+  idle:
+    'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAbElEQVR42q2TwQ3AIAhFvbof27DDv7CBM3Jv0wSSxkijhcO7SP6LAjZAWoao0AEhQNggO9sSPAEF5JpQq30KxiI4MyIBb4QdngU9uHaEek9cQAdhh94C/iHgUkH6CekmpsdYskglq1zymY64AY2gM2/rHrGAAAAAAElFTkSuQmCC',
+  recording:
+    'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAbElEQVR42q2TwQ3AIAhFvbrUn4Jt2MbJGIJ7myaQNEYaLRzeRfJfFLAJ0DJEhS4ACcAG2dmW4AmoANeEWu1TMBbBmREJeCPs8CzowbUj1HviAjoIO/QW8A8BlwrST0g3MT3GkkUqWeWSz3TEDWlI4GDZrX+mAAAAAElFTkSuQmCC',
+  processing:
+    'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAbUlEQVR42q2TwQnAMAhFc81STuE2LiOZzCG8txQiFIklqR7eJfIfiZomDC1DVOjCgMJAE5xnW4InoMJwOXTWPgVjEfSMSEAbYYO8oAfXjlDriQnwIGzgW0A/BFQqSD8h3cT0GEsWqWSVSz7TETe18UJv9JHQSQAAAABJRU5ErkJggg==',
+  error:
+    'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAbElEQVR42q2TwQ3AIAhFvbofA/w92MYJGI57myaQNEYaLRzeRfJfFLAJ0DJEhS4ACcAG2dmW4AmoANeEWu1TMBbBmREJeCPs8CzowbUj1HviAjoIO/QW8A8BlwrST0g3MT3GkkUqWeWSz7TEDcOg9GApY4CqAAAAAElFTkSuQmCC',
+};
 
 export const TRAY_ICONS = {
-  idle: () => circleIcon('#8e8e93'),
-  recording: () => circleIcon('#e03e3e'),
-  processing: () => circleIcon('#e0a03e'),
-  error: () => circleIcon('#b06060'),
+  idle: () => nativeImage.createFromDataURL(ICON_PNGS.idle),
+  recording: () => nativeImage.createFromDataURL(ICON_PNGS.recording),
+  processing: () => nativeImage.createFromDataURL(ICON_PNGS.processing),
+  error: () => nativeImage.createFromDataURL(ICON_PNGS.error),
 };
 
 export function buildTrayMenu({ state, settingsStore, history, onSettingsChanged, onShowOnboarding, onQuit }) {
