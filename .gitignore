@@ -35,3 +35,6 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# third-party skill clones (installed to ~/.claude, not part of this project)
+/gauntlet-loop
