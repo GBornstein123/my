@@ -40,7 +40,7 @@ export function ContactForm() {
   if (status === "sent") {
     return (
       <div className="rounded-2xl border border-rule bg-paper-raised p-8 md:p-10">
-        <p className="display-face text-2xl text-ink">Thank you — that arrived.</p>
+        <p className="display-face-sm text-2xl text-ink">Thank you — that arrived.</p>
         <p className="mt-3 text-ink-soft">
           I read everything myself, so replies take a few days rather than a few
           minutes.
@@ -74,15 +74,15 @@ export function ContactForm() {
       <div className="mt-5">
         <label
           htmlFor="reason"
-          className="block text-xs font-semibold uppercase tracking-[0.14em] text-ink-muted"
+          className="eyebrow block"
         >
-          What's this about
+          What’s this about
         </label>
         <select
           id="reason"
           name="reason"
           defaultValue={reasons[0]}
-          className="mt-2 w-full appearance-none rounded-xl border border-rule bg-paper px-4 py-3 text-ink outline-none transition-colors focus:border-accent"
+          className="mt-2 w-full appearance-none rounded-xl border border-rule bg-paper-sunk px-4 py-3 text-ink outline-none transition-colors focus:border-accent"
         >
           {reasons.map((r) => (
             <option key={r} value={r}>
@@ -95,7 +95,7 @@ export function ContactForm() {
       <div className="mt-5">
         <label
           htmlFor="message"
-          className="block text-xs font-semibold uppercase tracking-[0.14em] text-ink-muted"
+          className="eyebrow block"
         >
           Message
         </label>
@@ -105,7 +105,7 @@ export function ContactForm() {
           rows={6}
           required
           placeholder="As much or as little as you like."
-          className="mt-2 w-full resize-y rounded-xl border border-rule bg-paper px-4 py-3 text-ink placeholder:text-ink-muted/70 outline-none transition-colors focus:border-accent"
+          className="mt-2 w-full resize-y rounded-xl border border-rule bg-paper-sunk px-4 py-3 text-ink placeholder:text-ink-muted/70 outline-none transition-colors focus:border-accent"
         />
       </div>
 
@@ -113,7 +113,7 @@ export function ContactForm() {
         <button
           type="submit"
           disabled={status === "sending"}
-          className="rounded-full bg-ink px-7 py-3 text-paper transition-transform duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] hover:-translate-y-px disabled:opacity-60"
+          className="rounded-full border border-transparent bg-cta px-7 py-3 text-paper transition-transform duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] hover:-translate-y-px disabled:opacity-60"
         >
           {status === "sending" ? "Sending…" : "Send"}
         </button>
@@ -127,8 +127,8 @@ export function ContactForm() {
           role="alert"
           className="mt-5 rounded-xl border border-rule bg-paper-sunk px-4 py-3 text-[0.9375rem] text-ink-soft"
         >
-          That didn't send — the form has no backend connected yet. Wire{" "}
-          <code className="text-accent">/api/contact</code> to a mail provider.
+          That didn’t send. Please try again, or reach me directly if it keeps
+          failing.
         </p>
       )}
     </form>
@@ -149,7 +149,7 @@ function Field({
     <div>
       <label
         htmlFor={name}
-        className="block text-xs font-semibold uppercase tracking-[0.14em] text-ink-muted"
+        className="eyebrow block"
       >
         {label}
       </label>
@@ -157,7 +157,7 @@ function Field({
         id={name}
         name={name}
         type={type}
-        className="mt-2 w-full rounded-xl border border-rule bg-paper px-4 py-3 text-ink placeholder:text-ink-muted/70 outline-none transition-colors focus:border-accent"
+        className="mt-2 w-full rounded-xl border border-rule bg-paper-sunk px-4 py-3 text-ink placeholder:text-ink-muted/70 outline-none transition-colors focus:border-accent"
         {...rest}
       />
     </div>

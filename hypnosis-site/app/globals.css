@@ -7,8 +7,10 @@
   --color-paper-sunk: #f2ede4;
   --color-ink: #1a1614;
   --color-ink-soft: #4a423c;
-  --color-ink-muted: #7d736b;
+  --color-ink-muted: #6b6159; /* 5.4:1 on paper — AA at small sizes */
   --color-rule: #e2dace;
+  --color-rule-strong: #cdc0ae; /* meta separators, visible dividers */
+  --color-cta: #1a1614; /* primary button fill, de-escalated in dark */
 
   /* One accent, used sparingly — grounded, calm, not clinical */
   --color-accent: #2f5d5b;
@@ -24,35 +26,45 @@
   --text-title: clamp(1.5rem, 2.6vw, 2.125rem);
 
   --spacing-gutter: clamp(1.25rem, 5vw, 4rem);
+  --spacing-section: clamp(6rem, 10vw, 9rem);
 
   --ease-out-soft: cubic-bezier(0.22, 1, 0.36, 1);
 }
 
+/*
+ * Dark is not an inversion of light. Two things change role rather than value:
+ * rules need more contrast at low luminance to still read as edges, and the
+ * primary button fill is dimmed so a nav pill stops outranking the headline.
+ */
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
     --color-paper: #14110f;
-    --color-paper-raised: #1c1815;
+    --color-paper-raised: #1f1a16;
     --color-paper-sunk: #100e0c;
     --color-ink: #ede7df;
-    --color-ink-soft: #c3b9ad;
+    --color-ink-soft: #b0a89c;
     --color-ink-muted: #8d8378;
-    --color-rule: #2e2822;
+    --color-rule: #3a332c;
+    --color-rule-strong: #4d443b;
+    --color-cta: #c9c1b6;
     --color-accent: #7fb3ae;
-    --color-accent-soft: #1e2f2e;
+    --color-accent-soft: #23302f;
     --color-accent-ink: #a8ccc8;
   }
 }
 
 :root[data-theme="dark"] {
   --color-paper: #14110f;
-  --color-paper-raised: #1c1815;
+  --color-paper-raised: #1f1a16;
   --color-paper-sunk: #100e0c;
   --color-ink: #ede7df;
-  --color-ink-soft: #c3b9ad;
+  --color-ink-soft: #b0a89c;
   --color-ink-muted: #8d8378;
-  --color-rule: #2e2822;
+  --color-rule: #3a332c;
+  --color-rule-strong: #4d443b;
+  --color-cta: #c9c1b6;
   --color-accent: #7fb3ae;
-  --color-accent-soft: #1e2f2e;
+  --color-accent-soft: #23302f;
   --color-accent-ink: #a8ccc8;
 }
 
@@ -61,6 +73,8 @@
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
     scroll-behavior: smooth;
+    /* Native selects, autofill, scrollbars follow the theme */
+    color-scheme: light dark;
   }
 
   body {
@@ -79,7 +93,8 @@
   :focus-visible {
     outline: 2px solid var(--color-accent);
     outline-offset: 3px;
-    border-radius: 2px;
+    /* Follow the control's own shape — pills got rectangles before */
+    border-radius: inherit;
   }
 
   @media (prefers-reduced-motion: reduce) {
@@ -103,9 +118,11 @@
   padding-inline: var(--spacing-gutter);
 }
 
+/* max-width includes the gutter under border-box, so add it back to keep a
+   real ~656px text measure rather than 512px at desktop. */
 @utility container-prose {
   width: 100%;
-  max-width: 40rem;
+  max-width: calc(41rem + 2 * var(--spacing-gutter));
   margin-inline: auto;
   padding-inline: var(--spacing-gutter);
 }
@@ -118,6 +135,25 @@
   letter-spacing: -0.022em;
   line-height: 1.04;
   text-wrap: balance;
+}
+
+/* Same face at text sizes — display tracking pinches the fit below ~2rem */
+@utility display-face-sm {
+  font-family: var(--font-display);
+  font-optical-sizing: auto;
+  font-weight: 400;
+  letter-spacing: 0;
+  line-height: 1.15;
+}
+
+/* One recipe for every small uppercase label on the site */
+@utility eyebrow {
+  font-size: 0.75rem;
+  font-weight: 500;
+  line-height: 1.4;
+  text-transform: uppercase;
+  letter-spacing: 0.16em;
+  color: var(--color-ink-muted);
 }
 
 @utility rule-line {
@@ -133,6 +169,8 @@
 
   & p {
     margin-block: 1.5em;
+    /* Body prose is what actually needs wrap help — kills widows */
+    text-wrap: pretty;
   }
 
   & p:first-child {
@@ -159,10 +197,10 @@
 
   & h3 {
     font-family: var(--font-body);
-    font-size: 0.8125rem;
+    font-size: 0.75rem;
     text-transform: uppercase;
-    letter-spacing: 0.12em;
-    font-weight: 600;
+    letter-spacing: 0.16em;
+    font-weight: 500;
     color: var(--color-ink-muted);
     margin-block: 2.5em 0.5em;
   }

@@ -37,18 +37,18 @@ export default async function EssayPage({
   return (
     <article className="pb-8 pt-20 md:pt-28">
       <header className="container-prose">
-        <div className="flex items-center gap-3 text-xs uppercase tracking-[0.14em] text-ink-muted">
-          <span className="text-accent">{essay.tag}</span>
-          <span aria-hidden className="h-px w-4 bg-rule" />
+        <div className="eyebrow flex items-center gap-3">
+          <span>{essay.tag}</span>
+          <span aria-hidden className="h-px w-4 bg-rule-strong" />
           <time dateTime={essay.date}>{formatDate(essay.date)}</time>
-          <span aria-hidden className="h-px w-4 bg-rule" />
+          <span aria-hidden className="h-px w-4 bg-rule-strong" />
           <span>{essay.readingTime}</span>
         </div>
 
         <h1 className="display-face mt-7 text-[clamp(2.25rem,5.2vw,3.75rem)] text-ink">
           {essay.title}
         </h1>
-        <p className="mt-6 font-[family-name:var(--font-reading)] text-xl leading-relaxed text-ink-muted">
+        <p className="mt-6 text-balance font-[family-name:var(--font-reading)] text-xl leading-relaxed text-ink-muted">
           {essay.dek}
         </p>
       </header>
@@ -69,7 +69,7 @@ export default async function EssayPage({
 
       <div className="container-prose mt-24">
         <div className="rule-line pt-10">
-          <p className="text-xs uppercase tracking-[0.18em] text-ink-muted">
+          <p className="eyebrow">
             Read next
           </p>
           <Link
@@ -86,8 +86,8 @@ export default async function EssayPage({
         </div>
 
         <div className="mt-16 rounded-2xl bg-paper-sunk p-8">
-          <p className="display-face text-xl text-ink">
-            Something here seem wrong?
+          <p className="display-face-sm text-xl text-ink">
+            Something here seem wrong to you?
           </p>
           <p className="mt-3 leading-relaxed text-ink-soft">
             Corrections and disagreements are genuinely welcome —{" "}

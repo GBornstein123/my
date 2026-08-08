@@ -12,9 +12,7 @@ export default function ListenPage() {
   return (
     <div className="container-editorial pb-8 pt-20 md:pt-28">
       <header className="max-w-2xl">
-        <p className="text-xs uppercase tracking-[0.18em] text-ink-muted">
-          Listen
-        </p>
+        <p className="eyebrow">Listen</p>
         <h1 className="display-face mt-6 text-display text-ink">
           Recorded sessions, free and without conditions.
         </h1>
@@ -36,7 +34,9 @@ export default function ListenPage() {
         </p>
       </div>
 
-      <div className="mt-16 flex flex-col gap-px overflow-hidden rounded-2xl border border-rule bg-rule">
+      {/* Same column as the header — the players were the widest and emptiest
+          element on the page, with 217px of dead gutter per card. */}
+      <div className="mt-16 flex max-w-3xl flex-col gap-px overflow-hidden rounded-2xl border border-rule bg-rule">
         {sessions.map((session) => (
           <SessionPlayer key={session.slug} session={session} />
         ))}

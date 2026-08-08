@@ -24,7 +24,9 @@ const newsreader = Newsreader({
 });
 
 export const metadata: Metadata = {
-  metadataBase: new URL("https://example.com"),
+  metadataBase: new URL(
+    process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000",
+  ),
   title: {
     default: "Greg Bornstein — Hypnosis, attention, and the shape of the mind",
     template: "%s — Greg Bornstein",

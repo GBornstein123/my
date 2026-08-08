@@ -6,7 +6,7 @@ export function SiteFooter() {
       <div className="container-editorial py-16 md:py-20">
         <div className="grid gap-12 md:grid-cols-[1.5fr_1fr_1fr]">
           <div className="max-w-sm">
-            <p className="display-face text-2xl text-ink">Greg Bornstein</p>
+            <p className="display-face-sm text-2xl text-ink">Greg Bornstein</p>
             <p className="mt-4 text-[0.9375rem] leading-relaxed text-ink-muted">
               Essays and recorded sessions on hypnosis, attention, and
               suggestion — what the state actually is, and what it is not.
@@ -14,7 +14,7 @@ export function SiteFooter() {
           </div>
 
           <nav aria-label="Site" className="flex flex-col gap-3">
-            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-ink-muted">
+            <p className="eyebrow">
               Site
             </p>
             {[
@@ -34,7 +34,7 @@ export function SiteFooter() {
           </nav>
 
           <div className="flex flex-col gap-3">
-            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-ink-muted">
+            <p className="eyebrow">
               Elsewhere
             </p>
             <a

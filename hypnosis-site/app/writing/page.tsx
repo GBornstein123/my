@@ -12,11 +12,9 @@ export default function WritingIndex() {
   return (
     <div className="container-editorial pb-8 pt-20 md:pt-28">
       <header className="max-w-2xl">
-        <p className="text-xs uppercase tracking-[0.18em] text-ink-muted">
-          Writing
-        </p>
+        <p className="eyebrow">Writing</p>
         <h1 className="display-face mt-6 text-display text-ink">
-          Everything I&apos;ve published, most recent first.
+          Everything I’ve published, most recent first.
         </h1>
         <p className="mt-6 text-lg leading-relaxed text-ink-soft">
           Long pieces on the mechanism, shorter notes on things that come up
@@ -24,9 +22,13 @@ export default function WritingIndex() {
         </p>
       </header>
 
-      <div className="mt-20 grid gap-x-16 gap-y-16 border-t border-rule pt-14 sm:grid-cols-2 lg:grid-cols-3">
+      {/* A dated list reads like an archive; a 3-up card wall left a permanent
+          empty cell at five essays and will at any odd count. */}
+      <div className="mt-20 flex flex-col border-t border-rule">
         {essays.map((essay) => (
-          <EssayCard key={essay.slug} essay={essay} />
+          <div key={essay.slug} className="border-b border-rule py-12">
+            <EssayCard essay={essay} />
+          </div>
         ))}
       </div>
     </div>

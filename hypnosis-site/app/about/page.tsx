@@ -10,10 +10,10 @@ export const metadata: Metadata = {
 export default function AboutPage() {
   return (
     <div className="pb-8 pt-20 md:pt-28">
-      <header className="container-prose">
-        <p className="text-xs uppercase tracking-[0.18em] text-ink-muted">
-          About
-        </p>
+      {/* Header runs on the wider editorial column: at container-prose the
+          56px display size ragged onto five lines with an 11-char stub. */}
+      <header className="container-editorial max-w-3xl">
+        <p className="eyebrow">About</p>
         <h1 className="display-face mt-6 text-display text-ink">
           I write about hypnosis the way I wish someone had written about it for
           me.
@@ -48,7 +48,7 @@ export default function AboutPage() {
             that survives contact with what happens in real sessions.
           </p>
 
-          <h2>What I won&apos;t claim</h2>
+          <h2>What I won’t claim</h2>
           <p>
             I am not a doctor and none of this is medicine. Hypnosis is not a
             treatment for illness. It has real, studied uses alongside proper
@@ -66,9 +66,7 @@ export default function AboutPage() {
 
         {/* Factual bio deliberately left for Greg to fill — nothing invented. */}
         <aside className="mt-16 rounded-2xl border border-dashed border-rule bg-paper-sunk p-8">
-          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-accent">
-            To be written by Greg
-          </p>
+          <p className="eyebrow text-accent">To be written by Greg</p>
           <p className="mt-4 leading-relaxed text-ink-soft">
             This is where the factual biography goes — training, how you came to
             the work, how long you have practised, where you are based, and any
