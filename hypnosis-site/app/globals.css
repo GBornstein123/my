@@ -1,0 +1,244 @@
+@import "tailwindcss";
+
+@theme {
+  /* Paper & ink — warm, editorial, low-glare for long reading */
+  --color-paper: #faf7f2;
+  --color-paper-raised: #ffffff;
+  --color-paper-sunk: #f2ede4;
+  --color-ink: #1a1614;
+  --color-ink-soft: #4a423c;
+  --color-ink-muted: #7d736b;
+  --color-rule: #e2dace;
+
+  /* One accent, used sparingly — grounded, calm, not clinical */
+  --color-accent: #2f5d5b;
+  --color-accent-soft: #dfeae7;
+  --color-accent-ink: #1f403f;
+
+  --font-display: var(--font-fraunces), Georgia, "Times New Roman", serif;
+  --font-body: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  --font-reading: var(--font-newsreader), Georgia, serif;
+
+  --text-hero: clamp(2.75rem, 7vw, 5.25rem);
+  --text-display: clamp(2rem, 4.5vw, 3.5rem);
+  --text-title: clamp(1.5rem, 2.6vw, 2.125rem);
+
+  --spacing-gutter: clamp(1.25rem, 5vw, 4rem);
+
+  --ease-out-soft: cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --color-paper: #14110f;
+    --color-paper-raised: #1c1815;
+    --color-paper-sunk: #100e0c;
+    --color-ink: #ede7df;
+    --color-ink-soft: #c3b9ad;
+    --color-ink-muted: #8d8378;
+    --color-rule: #2e2822;
+    --color-accent: #7fb3ae;
+    --color-accent-soft: #1e2f2e;
+    --color-accent-ink: #a8ccc8;
+  }
+}
+
+:root[data-theme="dark"] {
+  --color-paper: #14110f;
+  --color-paper-raised: #1c1815;
+  --color-paper-sunk: #100e0c;
+  --color-ink: #ede7df;
+  --color-ink-soft: #c3b9ad;
+  --color-ink-muted: #8d8378;
+  --color-rule: #2e2822;
+  --color-accent: #7fb3ae;
+  --color-accent-soft: #1e2f2e;
+  --color-accent-ink: #a8ccc8;
+}
+
+@layer base {
+  html {
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    scroll-behavior: smooth;
+  }
+
+  body {
+    background-color: var(--color-paper);
+    color: var(--color-ink);
+    font-family: var(--font-body);
+    font-synthesis-weight: none;
+    text-rendering: optimizeLegibility;
+  }
+
+  ::selection {
+    background-color: var(--color-accent);
+    color: var(--color-paper);
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--color-accent);
+    outline-offset: 3px;
+    border-radius: 2px;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    html {
+      scroll-behavior: auto;
+    }
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+    }
+  }
+}
+
+@utility container-editorial {
+  width: 100%;
+  max-width: 76rem;
+  margin-inline: auto;
+  padding-inline: var(--spacing-gutter);
+}
+
+@utility container-prose {
+  width: 100%;
+  max-width: 40rem;
+  margin-inline: auto;
+  padding-inline: var(--spacing-gutter);
+}
+
+/* Display type wants tighter tracking and optical sizing as it scales up */
+@utility display-face {
+  font-family: var(--font-display);
+  font-optical-sizing: auto;
+  font-weight: 400;
+  letter-spacing: -0.022em;
+  line-height: 1.04;
+  text-wrap: balance;
+}
+
+@utility rule-line {
+  border-top: 1px solid var(--color-rule);
+}
+
+/* Long-form reading column */
+@utility prose-editorial {
+  font-family: var(--font-reading);
+  font-size: 1.1875rem;
+  line-height: 1.75;
+  color: var(--color-ink-soft);
+
+  & p {
+    margin-block: 1.5em;
+  }
+
+  & p:first-child {
+    margin-block-start: 0;
+  }
+
+  & > p:first-of-type::first-letter {
+    initial-letter: 2;
+    font-family: var(--font-display);
+    color: var(--color-ink);
+    padding-right: 0.08em;
+    font-weight: 500;
+  }
+
+  & h2 {
+    font-family: var(--font-display);
+    font-size: 1.75rem;
+    line-height: 1.2;
+    letter-spacing: -0.02em;
+    color: var(--color-ink);
+    margin-block: 2.5em 0.75em;
+    text-wrap: balance;
+  }
+
+  & h3 {
+    font-family: var(--font-body);
+    font-size: 0.8125rem;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    font-weight: 600;
+    color: var(--color-ink-muted);
+    margin-block: 2.5em 0.5em;
+  }
+
+  & blockquote {
+    margin-block: 2em;
+    padding-left: 1.5rem;
+    border-left: 2px solid var(--color-accent);
+    font-style: italic;
+    color: var(--color-ink);
+  }
+
+  & a {
+    color: var(--color-ink);
+    text-decoration: underline;
+    text-decoration-color: var(--color-accent);
+    text-underline-offset: 0.2em;
+    text-decoration-thickness: 1px;
+    transition: text-decoration-thickness 0.2s var(--ease-out-soft);
+  }
+
+  & a:hover {
+    text-decoration-thickness: 2px;
+  }
+
+  & ul {
+    margin-block: 1.5em;
+    padding-left: 1.25rem;
+    list-style: none;
+  }
+
+  & li {
+    position: relative;
+    margin-block: 0.6em;
+  }
+
+  & ul li::before {
+    content: "";
+    position: absolute;
+    left: -1.25rem;
+    top: 0.7em;
+    width: 5px;
+    height: 5px;
+    border-radius: 999px;
+    background-color: var(--color-accent);
+  }
+}
+
+@keyframes rise-in {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@utility rise {
+  animation: rise-in 0.9s var(--ease-out-soft) both;
+}
+
+/* Slow ambient drift for the hero field — deliberately almost imperceptible */
+@keyframes breathe {
+  0%,
+  100% {
+    transform: scale(1) translate3d(0, 0, 0);
+    opacity: 0.55;
+  }
+  50% {
+    transform: scale(1.08) translate3d(0, -1.5%, 0);
+    opacity: 0.75;
+  }
+}
+
+@utility breathing {
+  animation: breathe 14s ease-in-out infinite;
+}
