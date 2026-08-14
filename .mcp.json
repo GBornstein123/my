@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "amplifiers": {
+      "type": "http",
+      "url": "https://mcp.getamplifiers.com"
+    }
+  }
+}
