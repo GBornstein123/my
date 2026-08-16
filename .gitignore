@@ -35,3 +35,6 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# simplecast bulk update run artifacts (contain episode content, not secrets)
+/scripts/simplecast/runs/
