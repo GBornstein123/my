@@ -36,5 +36,13 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
-# simplecast bulk update run artifacts (contain episode content, not secrets)
+# bulk update run artifacts (contain episode/video content, not secrets)
 /scripts/simplecast/runs/
+/scripts/youtube/runs/
+
+# youtube oauth credentials — never commit these
+/scripts/youtube/client_secrets.json
+/scripts/youtube/.token.json
+/scripts/**/affiliate-block*.txt
+/scripts/**/affiliate-block*.html
+!/scripts/**/affiliate-block.example.txt
