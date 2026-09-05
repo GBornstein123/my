@@ -56,3 +56,31 @@ Price: $47 launch price (bottom of the $37–97 band, to accelerate review veloc
 ## Where to write
 Write ONLY to your assigned paths under /home/user/my/faceless-page-system/. Do not edit other agents'
 files. Do not touch anything else in the repo. Do not commit — the orchestrator commits.
+
+## Environment constraint (verified 2026-09-05) — READ THIS
+
+This build was produced in a sandbox whose network egress proxy blocks several domains outright.
+Confirmed blocked, by direct test:
+
+- **reddit.com** — denied by the egress proxy (403 on CONNECT) AND separately blocked by Reddit
+  against Anthropic's fetcher user agent. No workaround exists in this environment.
+- **irs.gov** — denied by the egress proxy (EGRESS_BLOCKED).
+
+General web search works and returns secondary sources (tax blogs, CPA marketing sites, calculator
+tools). It does not return IRS pages.
+
+Two consequences, both load-bearing:
+
+1. **No agent read Reddit.** Step 1 of the playbook — mining real threads for real problem
+   situations — was NOT performed. Problem situations in these files are constructed from domain
+   knowledge and secondary reporting. They are labeled as such. They are useful seed material and
+   they are not field research. The Reddit pass remains the single highest-value unfinished step,
+   and it has to be done by a human with a browser.
+
+2. **No tax figure here is primary-source verified.** Every rate, threshold, deadline, and form
+   reference came from secondary sources. Each is flagged and tabulated in the VERIFY BEFORE
+   PUBLISH / VERIFY BEFORE POSTING sections with the IRS URL to check it against. Nothing ships
+   until those tables are worked line by line against irs.gov from an unrestricted connection.
+
+If a file anywhere in this system implies a Reddit thread was read or an IRS publication was
+retrieved, that is an error — flag it and correct it rather than trusting it.
