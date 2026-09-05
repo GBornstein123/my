@@ -15,7 +15,7 @@ Why it passes the four filters:
 1. Financial consequence — underpaid quarterly estimates trigger IRS underpayment penalties plus interest;
    missed deductions cost four figures a year; a first-year 1099 worker who set aside nothing faces a
    five-figure April bill. Real money, measurable.
-2. ROI is arithmetic — a $57 guide against a $3,000+ avoidable tax bill or penalty closes itself.
+2. ROI is arithmetic — a $47 guide against a $3,000+ avoidable tax bill or penalty closes itself.
 3. Information is scattered — split across IRS publications written for accountants, contradictory blog
    posts, and state-level rules. It exists. Nobody has organized it into a sequence a panicking person
    can follow at 11pm.
