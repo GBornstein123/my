@@ -1,0 +1,7 @@
+# Fetched material stays local — never commit the corpus itself.
+transcripts/
+*.vtt
+*.mp3
+*.m4a
+*.info.json
+__pycache__/
