@@ -1,0 +1,16 @@
+WEBVTT
+
+STYLE
+::cue(v[voice="Jay"]) {
+  color: yellow;
+}
+
+REGION
+id:fred
+width:40%
+
+NOTE this is a comment
+spanning two lines
+
+00:00:01.000 --> 00:00:04.000
+<v Jay>The real leverage is in the follow-up.

@@ -1,0 +1,47 @@
+# Jay Abraham — public source manifest
+# Compiled 2026-09-07 from web search. URLs verified as search results only;
+# none were fetched (this container has no egress). Re-verify on first run.
+
+youtube:
+  channels:
+    - id: UC545lneSsqkjNtd_LZIW43g
+      handle: "@JayAbrahamOfficial"
+      url: https://www.youtube.com/channel/UC545lneSsqkjNtd_LZIW43g
+      note: primary channel
+    - handle: "@jayabrahamofficial8100"
+      url: https://www.youtube.com/@jayabrahamofficial8100
+      note: secondary/older uploads
+    - handle: abrahamadvantage
+      url: https://www.youtube.com/abrahamadvantage
+      note: legacy custom URL, may redirect to one of the above
+
+podcasts:
+  # Resolved to RSS at runtime via the iTunes Lookup API (see pull_podcasts.py).
+  apple_ids:
+    - id: 980277991
+      name: The Ultimate Entrepreneur
+      role: host  # his own show, ~326 episodes
+    - id: 1677943587
+      name: The Optimize Podcast with Jay Abraham & Nick Sonnenberg
+      role: co-host
+  # Guest appearances: one-off, no single feed. Collect episode URLs manually
+  # or via the aggregators below, then feed to pull_podcasts.py --urls.
+  guest_aggregators:
+    - https://www.listennotes.com/top-podcasts/jay-abraham/
+    - https://pod.casts.io/people/jay-abraham
+    - https://player.fm/podcasts/Jay%2520Abraham
+
+web_video:
+  # ASBN "Strategic Edge with Jay Abraham" — episodes embed video + carry article
+  # summaries. yt-dlp handles most embedded players; otherwise scrape article text.
+  - https://www.asbn.com/small-business-shows/strategic-edge-jay-abraham/
+  - https://www.asbn.com/small-business-shows/ultimate-entrepreneur/
+
+text:
+  - https://jaipremium.substack.com/        # jAI newsletter (co-authored w/ Michael Simmons)
+  - https://www.abraham.com/category/podcast/
+  - https://www.abraham.com/about/in-the-news/
+
+# Deliberately NOT included: Abraham University / Small Moves / mastermind
+# course material, and the paid tier of jAI. Those are paywalled products —
+# see README "Scope".

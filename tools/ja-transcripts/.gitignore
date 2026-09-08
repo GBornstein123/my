@@ -1,0 +1,11 @@
+# Fetched material stays local — never commit the corpus itself.
+transcripts/
+*.vtt
+*.mp3
+*.m4a
+*.info.json
+*.part
+__pycache__/
+
+# ...but the checked-in test fixtures are source, not corpus.
+!tests/fixtures/*.vtt
