@@ -1,15 +1,28 @@
 # Jay Abraham transcript pipeline
 
 Tooling to build a local, searchable transcript corpus from his **publicly
-posted** material. Nothing has been run yet — see "Why nothing ran here".
+posted** material. See "Status" for what has and has not been run.
 
-## Why nothing ran here
+## Status
 
-This container has no outbound network. Every egress attempt is refused by the
-proxy at CONNECT (`403 connect_rejected`) — verified against youtube.com,
-abraham.com, asbn.com, substack.com, podnews.net and feeds.megaphone.fm. There
-is also no `yt-dlp` and no `ffmpeg` installed. So the extraction has to run on
-your machine; what's here is the pipeline to do it.
+The pipeline has been exercised against controlled inputs and the bugs that
+surfaced are fixed (see `tests/`). It has **not** yet run against live
+YouTube/Apple/RSS endpoints — the session that fixed it was network-restricted
+the same way the original one was:
+
+```
+itunes.apple.com  youtube.com  feeds.megaphone.fm  asbn.com  abraham.com
+huggingface.co    -> all 403 at CONNECT (egress policy)
+```
+
+So feed resolution, caption fetching and ASR still need one live run on an
+unrestricted machine. Everything they depend on locally — VTT parsing, dedupe,
+feed parsing, filename generation, resume/atomicity, ASR timestamping — is
+covered by tests:
+
+```bash
+python3 tools/ja-transcripts/tests/test_pipeline.py
+```
 
 ## Setup
 
@@ -32,7 +45,10 @@ python3 pull_podcasts.py --apple-id 1677943587 --transcribe --limit 20
 ```
 
 Both tools are resumable: `pull_youtube.sh` keeps a `--download-archive`, and
-`pull_podcasts.py` skips episodes whose `.txt` already exists. Re-run to top up.
+`pull_podcasts.py` skips episodes whose `.txt` already exists. Audio and
+transcripts are written via `.part` files and renamed on completion, so an
+interrupted run leaves nothing half-written for the next one to mistake for
+finished work. Re-run to top up.
 
 Output is one timestamped `.txt` per item, so the corpus greps cleanly:
 
@@ -73,3 +89,4 @@ pipeline isn't pointed at them. Keep the output local and don't republish it.
 | `pull_youtube.sh` | yt-dlp caption fetch, no media download |
 | `pull_podcasts.py` | RSS resolve → list / download / ASR transcribe |
 | `vtt_to_txt.py` | VTT → timestamped text, rolling-window dedupe |
+| `tests/` | Regression tests — fixtures for each bug found so far |

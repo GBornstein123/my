@@ -1,0 +1,11 @@
+WEBVTT
+
+00:00:01.000 --> 00:00:04.000
+First real caption line.
+
+NOTE
+This is a multi-line comment
+that sits between cues.
+
+00:00:05.000 --> 00:00:08.000
+Second real caption line.

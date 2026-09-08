@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0" xmlns:itunes="http://www.itunes.com/dtds/podcast-1.0.dtd">
+<channel>
+  <title>The Ultimate Entrepreneur</title>
+  <item>
+    <title>Ep 300 — The Power of Preeminence: Why "Trusted Advisor" Wins</title>
+    <pubDate>Tue, 03 Sep 2026 10:00:00 -0700</pubDate>
+    <enclosure url="http://127.0.0.1:8765/a.mp3" type="audio/mpeg" length="12345"/>
+  </item>
+  <item>
+    <title>Ep 299 – Strategy of Preeminence</title>
+    <pubDate>Tue, 27 Aug 2026 10:00:00 -0700</pubDate>
+    <enclosure url="http://127.0.0.1:8765/b.mp3" type="audio/mpeg" length="12345"/>
+  </item>
+  <item>
+    <title>Ep 298 OLDEST but listed LAST-out-of-order</title>
+    <pubDate>Tue, 20 Aug 2026 10:00:00 -0700</pubDate>
+    <enclosure url="http://127.0.0.1:8765/c.mp3" type="audio/mpeg" length="12345"/>
+  </item>
+</channel>
+</rss>

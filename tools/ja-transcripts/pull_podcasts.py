@@ -16,11 +16,11 @@ Deps: pip install requests faster-whisper   (plus ffmpeg on PATH)
 import argparse
 import json
 import re
+import shutil
 import sys
 import urllib.parse
 import urllib.request
 import xml.etree.ElementTree as ET
-from datetime import datetime
 from email.utils import parsedate_to_datetime
 from pathlib import Path
 
@@ -31,6 +31,21 @@ def get(url, timeout=60):
     return urllib.request.urlopen(
         urllib.request.Request(url, headers=UA), timeout=timeout
     ).read()
+
+
+def download(url, dest, timeout=600):
+    """Stream to a .part file, then rename.
+
+    Episodes run to hundreds of MB, so this never buffers a whole one in
+    memory; the rename means an interrupted run leaves no truncated audio
+    that the next run would mistake for a finished download.
+    """
+    part = dest.with_name(dest.name + ".part")
+    with urllib.request.urlopen(
+        urllib.request.Request(url, headers=UA), timeout=timeout
+    ) as r, part.open("wb") as f:
+        shutil.copyfileobj(r, f, 1 << 20)
+    part.replace(dest)
 
 
 def feed_from_apple_id(apple_id):
@@ -66,18 +81,33 @@ def parse_feed(feed_url):
     return episodes
 
 
-def slug(s, n=90):
+def slug(s, n=120):
+    """Filesystem-safe stem, truncated to `n` *bytes*.
+
+    Character-based truncation overflowed the 255-byte name limit on titles
+    with accented or CJK text once the date prefix and extension were added.
+    """
     s = re.sub(r"[^\w\s-]", "", s).strip()
-    return re.sub(r"[\s_-]+", "-", s)[:n] or "untitled"
+    s = re.sub(r"[\s_-]+", "-", s)
+    return s.encode()[:n].decode(errors="ignore").rstrip("-") or "untitled"
+
+
+def hms(seconds):
+    """Offset into the audio as H:MM:SS -- not a wall-clock time."""
+    s = int(seconds)
+    return f"{s // 3600:02d}:{s // 60 % 60:02d}:{s % 60:02d}"
 
 
 def transcribe(audio_path, out_path, model):
+    """Write via a .part file so a mid-run ASR failure leaves no partial
+    transcript -- one would otherwise be treated as done on the next run."""
     segments, _ = model.transcribe(str(audio_path), vad_filter=True)
-    with out_path.open("w", encoding="utf-8") as f:
+    part = out_path.with_name(out_path.name + ".part")
+    with part.open("w", encoding="utf-8") as f:
         f.write(f"# source: {audio_path.name}\n\n")
         for seg in segments:
-            ts = datetime.utcfromtimestamp(seg.start).strftime("%H:%M:%S")
-            f.write(f"[{ts}] {seg.text.strip()}\n")
+            f.write(f"[{hms(seg.start)}] {seg.text.strip()}\n")
+    part.replace(out_path)
 
 
 def main():
@@ -101,6 +131,9 @@ def main():
         feed_url = args.feed
 
     eps = parse_feed(feed_url)
+    # --limit means "most recent N", so order explicitly: feeds are usually
+    # newest-first but nothing guarantees it.
+    eps.sort(key=lambda e: e["date"], reverse=True)
     if args.since:
         eps = [e for e in eps if e["date"] >= args.since]
     if args.limit:
@@ -135,7 +168,7 @@ def main():
         try:
             if not audio.exists():
                 print("    downloading...")
-                audio.write_bytes(get(e["audio"], timeout=600))
+                download(e["audio"], audio)
             print("    transcribing...")
             transcribe(audio, txt, model)
             print(f"    -> {txt.name}")
